@@ -41,12 +41,18 @@ class AuthController extends Controller
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
+            'role' => 'required|in:customer,vendor', // 🔑 ADD THIS
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        // 🔑 ROLE-AWARE QUERY
+        $user = User::where('email', $request->email)
+            ->where('role', $request->role) // IMPORTANT LINE
+            ->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
+            return response()->json([
+                'message' => 'Invalid credentials for this role'
+            ], 401);
         }
 
         $token = $user->createToken('mobile')->plainTextToken;
@@ -57,6 +63,7 @@ class AuthController extends Controller
             'token' => $token,
         ]);
     }
+
 
     // LOGOUT
     public function logout(Request $request)
