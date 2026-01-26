@@ -44,3 +44,9 @@ Route::middleware(['auth:sanctum', 'role:customer'])->group(function () {
         return response()->json(['message' => 'Customer only']);
     });
 });
+
+// Added
+Route::prefix('v1')->group(function () {
+    require __DIR__ . '/api/v1/public.php';
+});
+
