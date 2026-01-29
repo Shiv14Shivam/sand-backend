@@ -9,60 +9,73 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    // REGISTER (SECURE)
     public function register(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:6',
-            'role' => 'nullable|in:vendor,customer', // ❌ admin not allowed
+            'email' => 'required|email:rfc,dns|unique:users,email',
+            'password' => 'required|min:6|confirmed',
+            'role' => 'nullable|in:vendor,customer',
+            'phone' => 'nullable|string',
         ]);
+
+        // block temporary email domains
+        $blocked = ['mailinator.com', 'tempmail.com', '10minutemail.com'];
+        $domain = substr(strrchr($request->email, "@"), 1);
+
+        if (in_array($domain, $blocked)) {
+            return response()->json([
+                'message' => 'Temporary email addresses are not allowed.'
+            ], 422);
+        }
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => $request->role ?? 'customer', // backend decides
+            'role' => $request->role ?? 'customer',
+            'phone' => $request->phone, // ✅ stored phone number
         ]);
 
-        $token = $user->createToken('mobile')->plainTextToken;
+        // send email verification link
+        $user->sendEmailVerificationNotification();
 
         return response()->json([
-            'message' => 'User registered successfully',
-            'user' => $user,
-            'token' => $token,
+            'message' => 'Registered successfully. Please verify your email before login.',
         ], 201);
     }
 
-    // LOGIN
+
     public function login(Request $request)
     {
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
-            'role' => 'required|in:customer,vendor', // 🔑 ADD THIS
         ]);
 
-        // 🔑 ROLE-AWARE QUERY
-        $user = User::where('email', $request->email)
-            ->where('role', $request->role) // IMPORTANT LINE
-            ->first();
+        $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
-                'message' => 'Invalid credentials for this role'
+                'message' => 'Invalid credentials'
             ], 401);
+        }
+
+        if (!$user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'Please verify your email first.'
+            ], 403);
         }
 
         $token = $user->createToken('mobile')->plainTextToken;
 
         return response()->json([
             'message' => 'Login successful',
-            'user' => $user,
             'token' => $token,
+            'user' => $user,
         ]);
     }
+
 
 
     // LOGOUT
