@@ -1,10 +1,7 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
-use App\Models\User;
-use Illuminate\Auth\Events\Verified;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,55 +11,30 @@ use Illuminate\Auth\Events\Verified;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
-Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
 /*
 |--------------------------------------------------------------------------
-| Email Verification (PUBLIC - API SAFE)
+| Protected Routes
 |--------------------------------------------------------------------------
 */
-Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) {
+Route::middleware('auth:sanctum')->group(function () {
 
-    $user = User::findOrFail($id);
+    Route::post('/logout', [AuthController::class, 'logout']);
 
-    // validate hash
-    if (! hash_equals(sha1($user->getEmailForVerification()), $hash)) {
-        return response()->json(['message' => 'Invalid verification link'], 403);
-    }
+    Route::get('/profile', [AuthController::class, 'profile']);
+    Route::post('/update-profile', [AuthController::class, 'updateProfile']);
 
-    // already verified
-    if ($user->hasVerifiedEmail()) {
-        return response()->json(['message' => 'Email already verified']);
-    }
-
-    // mark verified
-    $user->markEmailAsVerified();
-    event(new Verified($user));
-
-    return response()->json([
-        'message' => 'Email verified successfully'
-    ]);
-})->middleware(['signed'])->name('verification.verify');
-
+    Route::post('/email/resend', [AuthController::class, 'resendVerification']);
+});
 
 /*
 |--------------------------------------------------------------------------
-| Resend Verification (AUTH REQUIRED)
+| Email Verification
 |--------------------------------------------------------------------------
 */
-Route::post('/email/resend', function (Request $request) {
-    if ($request->user()->hasVerifiedEmail()) {
-        return response()->json([
-            'message' => 'Email already verified'
-        ], 400);
-    }
-
-    $request->user()->sendEmailVerificationNotification();
-
-    return response()->json([
-        'message' => 'Verification email sent again'
-    ]);
-})->middleware(['auth:sanctum', 'throttle:6,1']);
+Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
+    ->middleware('signed')
+    ->name('verification.verify');
 
 /*
 |--------------------------------------------------------------------------
@@ -70,19 +42,13 @@ Route::post('/email/resend', function (Request $request) {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
-    Route::get('/admin/dashboard', function () {
-        return response()->json(['message' => 'Admin only']);
-    });
+    Route::get('/admin/dashboard', fn() => response()->json(['message' => 'Admin only']));
 });
 
 Route::middleware(['auth:sanctum', 'role:vendor'])->group(function () {
-    Route::get('/vendor/dashboard', function () {
-        return response()->json(['message' => 'Vendor only']);
-    });
+    Route::get('/vendor/dashboard', fn() => response()->json(['message' => 'Vendor only']));
 });
 
 Route::middleware(['auth:sanctum', 'role:customer'])->group(function () {
-    Route::get('/customer/dashboard', function () {
-        return response()->json(['message' => 'Customer only']);
-    });
+    Route::get('/customer/dashboard', fn() => response()->json(['message' => 'Customer only']));
 });
