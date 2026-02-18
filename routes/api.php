@@ -51,6 +51,15 @@ Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
 
 /*
 |--------------------------------------------------------------------------
+| Email Verification
+|--------------------------------------------------------------------------
+*/
+Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
+    ->middleware('signed')
+    ->name('verification.verify');
+
+/*
+|--------------------------------------------------------------------------
 | Role Protected Routes
 |--------------------------------------------------------------------------
 */
