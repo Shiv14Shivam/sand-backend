@@ -8,7 +8,7 @@ class Address extends Model
 {
     protected $fillable = [
         'user_id',
-        'address_type',
+
         'label',
         'address_line_1',
         'address_line_2',
@@ -23,4 +23,3 @@ class Address extends Model
         return $this->belongsTo(User::class);
     }
 }
-

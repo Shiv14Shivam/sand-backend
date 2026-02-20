@@ -12,61 +12,59 @@ use Illuminate\Support\Facades\Auth;
 class AddressController extends Controller
 {
     public function store(Request $request)
-{
-   $user = Auth::user();// from Sanctum token
+    {
+        $user = Auth::user(); // from Sanctum token
 
-    $address = Address::create([
-        'user_id' => $user->id,
-        'address_type' => $request->address_type,
-        'label' => $request->label,
-        'address_line_1' => $request->address_line_1,
-        'address_line_2' => $request->address_line_2,
-        'city' => $request->city,
-        'state' => $request->state,
-        'pincode' => $request->pincode,
-        'is_default' => $request->is_default ?? false,
-    ]);
+        $address = Address::create([
+            'user_id' => $user->id,
 
-    return response()->json($address);
-}
-public function index()        // List all addresses of the authenticated user
-{
-    return Auth::user()->addresses;
-}
-  
-public function update(Request $request, $id) // Update an address, ensuring it belongs to the authenticated user
-{
-    $address = Address::where('id', $id)
-                      ->where('user_id', auth::id())
-                      ->firstOrFail();
+            'label' => $request->label,
+            'address_line_1' => $request->address_line_1,
+            'address_line_2' => $request->address_line_2,
+            'city' => $request->city,
+            'state' => $request->state,
+            'pincode' => $request->pincode,
+            'is_default' => $request->is_default ?? false,
+        ]);
 
-    $address->update($request->all());
+        return response()->json($address);
+    }
+    public function index()        // List all addresses of the authenticated user
+    {
+        return Auth::user()->addresses;
+    }
 
-    return response()->json($address);
-}
-public function destroy($id)              // Delete an address, ensuring it belongs to the authenticated user
-{
-    Address::where('id', $id)
-           ->where('user_id', auth::id())
-           ->delete();
+    public function update(Request $request, $id) // Update an address, ensuring it belongs to the authenticated user
+    {
+        $address = Address::where('id', $id)
+            ->where('user_id', auth::id())
+            ->firstOrFail();
 
-    return response()->json(['message' => 'Address deleted']);
-}
+        $address->update($request->all());
 
-// Set an address as default, ensuring it belongs to the authenticated user
-public function setDefault($id)
-{
-    $userId = auth::id();
+        return response()->json($address);
+    }
+    public function destroy($id)              // Delete an address, ensuring it belongs to the authenticated user
+    {
+        Address::where('id', $id)
+            ->where('user_id', auth::id())
+            ->delete();
 
-    Address::where('user_id', $userId)
-           ->update(['is_default' => false]);
+        return response()->json(['message' => 'Address deleted']);
+    }
 
-    Address::where('id', $id)
-           ->where('user_id', $userId)
-           ->update(['is_default' => true]);
+    // Set an address as default, ensuring it belongs to the authenticated user
+    public function setDefault($id)
+    {
+        $userId = auth::id();
 
-    return response()->json(['message' => 'Default address updated']);
-}
+        Address::where('user_id', $userId)
+            ->update(['is_default' => false]);
 
+        Address::where('id', $id)
+            ->where('user_id', $userId)
+            ->update(['is_default' => true]);
 
+        return response()->json(['message' => 'Default address updated']);
+    }
 }
