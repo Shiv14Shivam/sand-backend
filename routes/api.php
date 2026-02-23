@@ -3,6 +3,61 @@
 use App\Http\Controllers\Api\AddressController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\BrandController;
+use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\MarketplaceListingController;
+
+/*
+|--------------------------------------------------------------------------
+| Category Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/categories', [CategoryController::class, 'index']);
+Route::get('/categories/{id}', [CategoryController::class, 'show']);
+
+/*
+|--------------------------------------------------------------------------
+| Brands Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/brands', [BrandController::class, 'index']);
+Route::get('/categories/{id}/brands', [BrandController::class, 'brandsByCategory']);
+Route::get('/brands/{id}', [BrandController::class, 'show']);
+
+/*
+|--------------------------------------------------------------------------
+| Products Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/products', [ProductController::class, 'index']);
+Route::get('/brands/{id}/products', [ProductController::class, 'productsByBrand']);
+Route::get('/products/{id}', [ProductController::class, 'show']);
+
+/*
+|--------------------------------------------------------------------------
+| Seller Listing Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/seller/listings', [MarketplaceListingController::class, 'myListings']);
+    Route::post('/seller/listings', [MarketplaceListingController::class, 'store']);
+    Route::get('/seller/listings/{id}', [MarketplaceListingController::class, 'show']);
+    Route::put('/seller/listings/{id}', [MarketplaceListingController::class, 'update']);
+    Route::delete('/seller/listings/{id}', [MarketplaceListingController::class, 'destroy']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Marketplace Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/marketplace', [MarketplaceListingController::class, 'index']);
 
 /*
 |--------------------------------------------------------------------------
