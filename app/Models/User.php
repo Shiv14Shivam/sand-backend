@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -10,6 +11,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 class User extends Authenticatable implements MustVerifyEmail
 {
     use HasApiTokens, Notifiable;
+    use HasFactory;
 
     protected $fillable = [
         'name',
@@ -17,6 +19,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'password',
         'role',
         'phone',
+
     ];
 
     protected $hidden = [
@@ -25,8 +28,11 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     public function addresses()
-{
-    return $this->hasMany(Address::class);
-}
-
+    {
+        return $this->hasMany(Address::class);
+    }
+    public function vendor()
+    {
+        return $this->hasOne(Vendor::class);
+    }
 }
