@@ -8,10 +8,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Auth\Events\Verified;
+use App\Models\Vendor;
 
 class AuthController extends Controller
 {
     // ================= REGISTER =================
+
     public function register(Request $request)
     {
         $request->validate([
@@ -20,9 +22,11 @@ class AuthController extends Controller
             'password' => 'required|min:6|confirmed',
             'role' => 'nullable|in:vendor,customer',
             'phone' => 'nullable|string',
-        ]);
 
-        $this->blockTempEmail($request->email);
+            'firm_name' => 'required_if:role,vendor|string|max:255',
+            'business_type' => 'required_if:role,vendor|string|max:255',
+            'gst_number' => 'required_if:role,vendor|string|max:50|unique:vendors,gst_number',
+        ]);
 
         $user = User::create([
             'name' => $request->name,
@@ -31,6 +35,15 @@ class AuthController extends Controller
             'role' => $request->role ?? 'customer',
             'phone' => $request->phone,
         ]);
+
+        if ($user->role === 'vendor') {
+            Vendor::create([
+                'user_id' => $user->id,
+                'firm_name' => $request->firm_name,
+                'business_type' => $request->business_type,
+                'gst_number' => $request->gst_number,
+            ]);
+        }
 
         $user->sendEmailVerificationNotification();
 
@@ -76,10 +89,20 @@ class AuthController extends Controller
     // ================= PROFILE =================
     public function profile(Request $request)
     {
-        return response()->json(['user' => $request->user()]);
+        $user = $request->user();
+
+        // If vendor, load vendor relationship
+        if ($user->role === 'vendor') {
+            $user->load('vendor');
+        }
+
+        return response()->json([
+            'user' => $user
+        ]);
     }
 
     // ================= UPDATE PROFILE =================
+
     public function updateProfile(Request $request)
     {
         $user = $request->user();
@@ -92,10 +115,19 @@ class AuthController extends Controller
                 Rule::unique('users')->ignore($user->id),
             ],
             'phone' => 'nullable|string',
+
+            // Vendor fields (only required if vendor)
+            'firm_name' => 'required_if:role,vendor|string|max:255',
+            'business_type' => 'required_if:role,vendor|string|max:255',
+            'gst_number' => [
+                'required_if:role,vendor',
+                Rule::unique('vendors', 'gst_number')->ignore(optional($user->vendor)->id),
+            ],
         ]);
 
         $this->blockTempEmail($request->email);
 
+        // ================= EMAIL CHANGE =================
         if ($request->email !== $user->email) {
             $user->email = $request->email;
             $user->email_verified_at = null;
@@ -109,17 +141,31 @@ class AuthController extends Controller
             ]);
         }
 
+        // ================= UPDATE USER =================
         $user->update([
             'name' => $request->name,
             'phone' => $request->phone,
         ]);
 
+        // ================= UPDATE VENDOR =================
+        if ($user->role === 'vendor') {
+
+            $vendor = $user->vendor;
+
+            if ($vendor) {
+                $vendor->update([
+                    'firm_name' => $request->firm_name,
+                    'business_type' => $request->business_type,
+                    'gst_number' => $request->gst_number,
+                ]);
+            }
+        }
+
         return response()->json([
             'message' => 'Profile updated successfully',
-            'user' => $user,
+            'user' => $user->load('vendor'),
         ]);
     }
-
     // ================= VERIFY EMAIL =================
     public function verifyEmail(Request $request, $id, $hash)
     {

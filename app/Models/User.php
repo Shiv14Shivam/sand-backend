@@ -17,6 +17,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'password',
         'role',
         'phone',
+
     ];
 
     protected $hidden = [
@@ -25,8 +26,11 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     public function addresses()
-{
-    return $this->hasMany(Address::class);
-}
-
+    {
+        return $this->hasMany(Address::class);
+    }
+    public function vendor()
+    {
+        return $this->hasOne(Vendor::class);
+    }
 }
