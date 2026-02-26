@@ -27,7 +27,11 @@ class DatabaseSeeder extends Seeder
         // To be changed back to original one in main
         User::firstOrCreate(
             ['email' => 'test@example.com'],
-            ['name' => 'Test User']
+            [
+                'name' => 'Test User',
+                'password' => bcrypt('password'),
+                'role' => 'customer'
+            ]
         );
 
         // ── Categories ───────────────────────────────────────────────────
@@ -154,7 +158,6 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->command->info('Marketplace seed data created successfully.');
-
     }
 
     // ─── Helper ───────────────────────────────────────────────────────────

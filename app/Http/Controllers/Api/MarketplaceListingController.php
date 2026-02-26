@@ -13,6 +13,7 @@ use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class MarketplaceListingController extends Controller
@@ -23,10 +24,18 @@ class MarketplaceListingController extends Controller
      * GET /api/seller/listings
      * Returns all listings for the authenticated seller.
      */
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection|JsonResponse
     {
+        $sellerId = Auth::user()?->id;
+
+        if (!$sellerId) {
+            return response()->json([
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
         $listings = MarketplaceListing::query()
-            ->forSeller(auth()->id())
+            ->forSeller($sellerId)
             ->with(['product.specifications', 'category', 'brand'])
             ->latest()
             ->paginate(15);
@@ -59,9 +68,17 @@ class MarketplaceListingController extends Controller
             ], 422);
         }
 
+        $sellerId = Auth::user()?->id;
+
+        if (!$sellerId) {
+            return response()->json([
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
         // Check if seller already has an active listing for this product
         $existing = MarketplaceListing::query()
-            ->forSeller(auth()->id())
+            ->forSeller($sellerId)
             ->where('product_id', $product->id)
             ->whereIn('status', [MarketplaceListing::STATUS_ACTIVE, MarketplaceListing::STATUS_PENDING])
             ->first();
@@ -73,9 +90,9 @@ class MarketplaceListingController extends Controller
             ], 422);
         }
 
-        $listing = DB::transaction(function () use ($request, $product, $brand, $category) {
+        $listing = DB::transaction(function () use ($request, $product, $brand, $category, $sellerId) {
             return MarketplaceListing::create([
-                'seller_id'               => auth()->id(),
+                'seller_id'               => $sellerId,
                 'product_id'              => $product->id,
                 'category_id'             => $category->id,
                 'brand_id'                => $brand->id,
@@ -158,9 +175,9 @@ class MarketplaceListingController extends Controller
         $listings = MarketplaceListing::query()
             ->active()
             ->with(['product.specifications', 'category', 'brand', 'seller'])
-            ->when($request->filled('category_id'), fn ($q) => $q->where('category_id', $request->category_id))
-            ->when($request->filled('brand_id'),    fn ($q) => $q->where('brand_id', $request->brand_id))
-            ->when($request->filled('product_id'),  fn ($q) => $q->where('product_id', $request->product_id))
+            ->when($request->filled('category_id'), fn($q) => $q->where('category_id', $request->category_id))
+            ->when($request->filled('brand_id'),    fn($q) => $q->where('brand_id', $request->brand_id))
+            ->when($request->filled('product_id'),  fn($q) => $q->where('product_id', $request->product_id))
             ->latest()
             ->paginate(20);
 
@@ -171,7 +188,7 @@ class MarketplaceListingController extends Controller
 
     private function authorizeOwnership(MarketplaceListing $listing): void
     {
-        if ($listing->seller_id !== auth()->id()) {
+        if ($listing->seller_id !== Auth::user()?->id) {
             abort(403, 'You do not have permission to access this listing.');
         }
     }
