@@ -24,9 +24,8 @@ Route::get('/categories/{id}', [CategoryController::class, 'show']);
 */
 
 Route::get('/brands', [BrandController::class, 'index']);
-Route::get('/categories/{id}/brands', [BrandController::class, 'brandsByCategory']);
-Route::get('/brands/{id}', [BrandController::class, 'show']);
-
+Route::get('/categories/{category}/brands', [BrandController::class, 'byCategory']);
+Route::get('/brands/{brand}', [BrandController::class, 'show']);
 /*
 |--------------------------------------------------------------------------
 | Products Routes
@@ -34,8 +33,8 @@ Route::get('/brands/{id}', [BrandController::class, 'show']);
 */
 
 Route::get('/products', [ProductController::class, 'index']);
-Route::get('/brands/{id}/products', [ProductController::class, 'productsByBrand']);
-Route::get('/products/{id}', [ProductController::class, 'show']);
+Route::get('/brands/{brand}/products', [ProductController::class, 'byBrand']);
+Route::get('/products/{product}', [ProductController::class, 'show']);
 
 /*
 |--------------------------------------------------------------------------
@@ -44,7 +43,7 @@ Route::get('/products/{id}', [ProductController::class, 'show']);
 */
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/seller/listings', [MarketplaceListingController::class, 'myListings']);
+    Route::get('/seller/listings', [MarketplaceListingController::class, 'index']);
     Route::post('/seller/listings', [MarketplaceListingController::class, 'store']);
     Route::get('/seller/listings/{id}', [MarketplaceListingController::class, 'show']);
     Route::put('/seller/listings/{id}', [MarketplaceListingController::class, 'update']);
@@ -57,7 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::get('/marketplace', [MarketplaceListingController::class, 'index']);
+Route::get('/marketplace', [MarketplaceListingController::class, 'publicIndex']);
 
 /*
 |--------------------------------------------------------------------------
@@ -85,14 +84,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
 
-    Route::get('/addresses', [AddressController::class, 'index']);
-    Route::post('/addresses', [AddressController::class, 'store']);
-    Route::put('/addresses/{id}', [AddressController::class, 'update']);
-    Route::delete('/addresses/{id}', [AddressController::class, 'destroy']);
-    Route::post('/addresses/{id}/default', [AddressController::class, 'setDefault']);
-
-});
-
+        Route::get('/addresses', [AddressController::class, 'index']);
+        Route::post('/addresses', [AddressController::class, 'store']);
+        Route::put('/addresses/{id}', [AddressController::class, 'update']);
+        Route::delete('/addresses/{id}', [AddressController::class, 'destroy']);
+        Route::post('/addresses/{id}/default', [AddressController::class, 'setDefault']);
+    });
 });
 
 /*
