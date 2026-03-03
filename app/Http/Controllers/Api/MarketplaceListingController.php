@@ -39,8 +39,21 @@ class MarketplaceListingController extends Controller
         return MarketplaceListingResource::collection($listings);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Create Listing
+    |--------------------------------------------------------------------------
+    */
+
     public function store(StoreMarketplaceListingRequest $request): JsonResponse
     {
+        $sellerId = Auth::id();
+
+        if (!$sellerId) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        // Validate relationships
         $category = Category::findOrFail($request->category_id);
         $brand    = Brand::findOrFail($request->brand_id);
         $product  = Product::findOrFail($request->product_id);
@@ -57,22 +70,86 @@ class MarketplaceListingController extends Controller
             ], 422);
         }
 
-        $sellerId = Auth::id();
+        /*
+        |--------------------------------------------------------------------------
+        | 🔒 FIX: Prevent Duplicate Listing by Same Seller
+        |--------------------------------------------------------------------------
+        |
+        | Problem:
+        | A seller could list the same product multiple times.
+        |
+        | Solution:
+        | Check if seller already has a listing for this product.
+        |
+        */
 
-        if (!$sellerId) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+        $existingListing = MarketplaceListing::where('seller_id', $sellerId)
+            ->where('product_id', $product->id)
+            ->first();
+
+        if ($existingListing) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | OPTION A: Reject Duplicate (Strict Mode)
+            |--------------------------------------------------------------------------
+            |
+            | Uncomment this block if you want to reject duplicates completely.
+            |
+            */
+
+            /*
+            return response()->json([
+                'message' => 'You have already listed this product.'
+            ], 422);
+            */
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | OPTION B: Update Existing Listing (Recommended UX)
+            |--------------------------------------------------------------------------
+            |
+            | Instead of rejecting, we update existing listing.
+            | This is better for vendors.
+            |
+            */
+
+            $existingListing->update([
+                'price_per_bag'           => $request->price_per_bag,
+                'delivery_charge_per_ton' => $request->delivery_charge_per_ton ?? 0,
+                'available_stock_bags'    => $request->available_stock_bags,
+                'status'                  => MarketplaceListing::STATUS_ACTIVE,
+            ]);
+
+            return response()->json([
+                'message' => 'Listing already exists. Updated successfully.',
+                'data'    => new MarketplaceListingResource($existingListing)
+            ], 200);
         }
 
-        $listing = MarketplaceListing::create([
-            'seller_id'               => $sellerId,
-            'product_id'              => $product->id,
-            'category_id'             => $category->id,
-            'brand_id'                => $brand->id,
-            'price_per_bag'           => $request->price_per_bag,
-            'delivery_charge_per_ton' => $request->delivery_charge_per_ton ?? 0,
-            'available_stock_bags'    => $request->available_stock_bags,
-            'status'                  => MarketplaceListing::STATUS_ACTIVE, // direct active
-        ]);
+        /*
+        |--------------------------------------------------------------------------
+        | 🛡️ FIX: Use DB Transaction (Prevents Race Condition)
+        |--------------------------------------------------------------------------
+        |
+        | If two requests hit at same time, this protects integrity.
+        |
+        */
+
+        $listing = DB::transaction(function () use ($sellerId, $product, $category, $brand, $request) {
+
+            return MarketplaceListing::create([
+                'seller_id'               => $sellerId,
+                'product_id'              => $product->id,
+                'category_id'             => $category->id,
+                'brand_id'                => $brand->id,
+                'price_per_bag'           => $request->price_per_bag,
+                'delivery_charge_per_ton' => $request->delivery_charge_per_ton ?? 0,
+                'available_stock_bags'    => $request->available_stock_bags,
+                'status'                  => MarketplaceListing::STATUS_ACTIVE,
+            ]);
+        });
 
         return response()->json([
             'message' => 'Listing created successfully.',
@@ -89,7 +166,12 @@ class MarketplaceListingController extends Controller
     public function publicIndex(Request $request)
     {
         $listings = MarketplaceListing::where('status', 'active')
-            /*change*/->with(['product.specifications', 'category', 'brand', 'seller']) // specifications for detailed info, seller for contact details
+            ->with([
+                'product.specifications',
+                'category',
+                'brand',
+                'seller'
+            ])
             ->latest()
             ->paginate(20);
 
