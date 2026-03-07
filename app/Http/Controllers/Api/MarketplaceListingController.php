@@ -74,13 +74,6 @@ class MarketplaceListingController extends Controller
         |--------------------------------------------------------------------------
         | 🔒 FIX: Prevent Duplicate Listing by Same Seller
         |--------------------------------------------------------------------------
-        |
-        | Problem:
-        | A seller could list the same product multiple times.
-        |
-        | Solution:
-        | Check if seller already has a listing for this product.
-        |
         */
 
         $existingListing = MarketplaceListing::where('seller_id', $sellerId)
@@ -88,33 +81,6 @@ class MarketplaceListingController extends Controller
             ->first();
 
         if ($existingListing) {
-
-            /*
-            |--------------------------------------------------------------------------
-            | OPTION A: Reject Duplicate (Strict Mode)
-            |--------------------------------------------------------------------------
-            |
-            | Uncomment this block if you want to reject duplicates completely.
-            |
-            */
-
-            /*
-            return response()->json([
-                'message' => 'You have already listed this product.'
-            ], 422);
-            */
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | OPTION B: Update Existing Listing (Recommended UX)
-            |--------------------------------------------------------------------------
-            |
-            | Instead of rejecting, we update existing listing.
-            | This is better for vendors.
-            |
-            */
-
             $existingListing->update([
                 'price_per_bag'           => $request->price_per_bag,
                 'delivery_charge_per_ton' => $request->delivery_charge_per_ton ?? 0,
@@ -132,13 +98,9 @@ class MarketplaceListingController extends Controller
         |--------------------------------------------------------------------------
         | 🛡️ FIX: Use DB Transaction (Prevents Race Condition)
         |--------------------------------------------------------------------------
-        |
-        | If two requests hit at same time, this protects integrity.
-        |
         */
 
         $listing = DB::transaction(function () use ($sellerId, $product, $category, $brand, $request) {
-
             return MarketplaceListing::create([
                 'seller_id'               => $sellerId,
                 'product_id'              => $product->id,
@@ -170,11 +132,52 @@ class MarketplaceListingController extends Controller
                 'product.specifications',
                 'category',
                 'brand',
-                'seller'
+                // ✅ FIX: load vendor's default address for warehouse coordinates
+                'seller.addresses' => function ($q) {
+                    $q->where('is_default', true)->limit(1);
+                },
             ])
             ->latest()
             ->paginate(20);
 
-        return response()->json($listings);
+        return response()->json([
+            'data' => $listings->getCollection()->map(function ($listing) {
+                $seller        = $listing->seller;
+                // ✅ vendor's default address — used for distance calculation
+                $vendorDefault = $seller?->addresses->first();
+
+                return [
+                    'id'                      => $listing->id,
+                    'price_per_bag'           => $listing->price_per_bag,
+                    'delivery_charge_per_ton' => $listing->delivery_charge_per_ton,
+                    'available_stock_bags'    => $listing->available_stock_bags,
+
+                    'category' => [
+                        'id'   => $listing->category?->id,
+                        'name' => $listing->category?->name,
+                    ],
+
+                    'product' => [
+                        'id'                   => $listing->product?->id,
+                        'name'                 => $listing->product?->name,
+                        'short_description'    => $listing->product?->short_description,
+                        'detailed_description' => $listing->product?->detailed_description,
+                        'image_url'            => $listing->product?->image_url,
+                        'unit'                 => $listing->product?->unit,
+                        'specifications'       => $listing->product?->specifications ?? [],
+                    ],
+
+                    'seller' => [
+                        'id'    => $seller?->id,
+                        'name'  => $seller?->name,
+                        'phone' => $seller?->phone,
+                        // ✅ coords from vendor's default address
+                        // customer default ↔ vendor default = distance
+                        'warehouse_lat' => $vendorDefault?->latitude,
+                        'warehouse_lng' => $vendorDefault?->longitude,
+                    ],
+                ];
+            }),
+        ]);
     }
 }

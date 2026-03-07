@@ -89,6 +89,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/addresses/{id}', [AddressController::class, 'update']);
         Route::delete('/addresses/{id}', [AddressController::class, 'destroy']);
         Route::post('/addresses/{id}/default', [AddressController::class, 'setDefault']);
+        Route::get('/address/default', [AddressController::class, 'getDefault']);
     });
 });
 

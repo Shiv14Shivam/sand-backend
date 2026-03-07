@@ -15,6 +15,8 @@ class Address extends Model
         'city',
         'state',
         'pincode',
+        'latitude',
+        'longitude',
         'is_default'
     ];
 
