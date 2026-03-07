@@ -121,12 +121,12 @@ Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('cart')->group(function () {
-    Route::get('/',        [CartController::class, 'index']);   // View cart
-    Route::post('/',       [CartController::class, 'store']);   // Add item
-    Route::put('/{id}',    [CartController::class, 'update']);  // Update qty
-    Route::delete('/clear',[CartController::class, 'clear']);   // Clear cart
-    Route::delete('/{id}', [CartController::class, 'destroy']); // Remove item
+Route::middleware('auth:sanctum')->prefix('cart')->group(function () {
+    Route::get('/',         [CartController::class, 'index']);
+    Route::post('/',        [CartController::class, 'store']);
+    Route::put('/{id}',     [CartController::class, 'update']);
+    Route::delete('/clear', [CartController::class, 'clear']);
+    Route::delete('/{id}',  [CartController::class, 'destroy']);
 });
 
 /*
@@ -139,8 +139,8 @@ Route::prefix('orders')->group(function () {
     Route::get('/',              [OrderController::class, 'history']);      // Order history
     Route::get('/{id}',          [OrderController::class, 'show']);         // Single order
     Route::post('/direct',       [OrderController::class, 'placeDirect']);  // Direct order
-    Route::post('/from-cart',    [OrderController::class, 'placeFromCart']);// Checkout cart
-    Route::delete('/{id}/cancel',[OrderController::class, 'cancel']);       // Cancel order
+    Route::post('/from-cart',    [OrderController::class, 'placeFromCart']); // Checkout cart
+    Route::delete('/{id}/cancel', [OrderController::class, 'cancel']);       // Cancel order
 });
 
 /*
@@ -153,7 +153,7 @@ Route::prefix('vendor/orders')->group(function () {
     Route::get('/',             [VendorOrderController::class, 'index']);    // All order items for this vendor
     Route::get('/{id}',         [VendorOrderController::class, 'show']);     // Single item detail
     Route::post('/{id}/accept', [VendorOrderController::class, 'accept']);   // Accept → stock deducted
-    Route::post('/{id}/decline',[VendorOrderController::class, 'decline']);  // Decline → reason required
+    Route::post('/{id}/decline', [VendorOrderController::class, 'decline']);  // Decline → reason required
 });
 
 /*
@@ -165,7 +165,7 @@ Route::prefix('vendor/orders')->group(function () {
 Route::prefix('vendor/inventory')->group(function () {
     Route::get('/',              [VendorInventoryController::class, 'index']);    // All listings with stock
     Route::get('/{id}',          [VendorInventoryController::class, 'show']);     // Single listing with stats
-    Route::patch('/{id}/restock',[VendorInventoryController::class, 'restock']); // Add stock manually
+    Route::patch('/{id}/restock', [VendorInventoryController::class, 'restock']); // Add stock manually
 });
 
 /*

@@ -17,26 +17,45 @@ class CartItemResource extends JsonResource
             'quantity_bags' => $this->quantity_bags,
             'added_at'      => $this->created_at?->toISOString(),
 
-            // Live stock check so frontend can warn the customer
-            'in_stock'      => $listing && $listing->available_stock_bags >= $this->quantity_bags,
+            'in_stock' => $listing &&
+                $listing->available_stock_bags >= $this->quantity_bags,
 
             'listing' => $this->whenLoaded('listing', function () use ($listing) {
+                $seller        = $listing->seller;
+                // vendor's default address for distance calculation
+                $vendorAddress = $seller?->addresses->first();
+
                 return [
                     'id'                      => $listing->id,
                     'status'                  => $listing->status,
                     'price_per_bag'           => $listing->price_per_bag,
                     'delivery_charge_per_ton' => $listing->delivery_charge_per_ton,
                     'available_stock_bags'    => $listing->available_stock_bags,
-                    'line_total'              => round($listing->price_per_bag * $this->quantity_bags, 2),
-                    'product'                 => new ProductResource($this->listing->whenLoaded('product')),
-                    'brand'                   => new BrandResource($this->listing->whenLoaded('brand')),
-                    'category'                => new CategoryResource($this->listing->whenLoaded('category')),
-                    'seller' => $this->whenLoaded('listing', function () use ($listing) {
-                        return $listing->relationLoaded('seller') ? [
-                            'id'   => $listing->seller->id,
-                            'name' => $listing->seller->name,
-                        ] : null;
-                    }),
+                    'line_total'              => round(
+                        $listing->price_per_bag * $this->quantity_bags,
+                        2
+                    ),
+
+                    'product'  => $listing->relationLoaded('product')
+                        ? new ProductResource($listing->product)
+                        : null,
+
+                    'brand'    => $listing->relationLoaded('brand')
+                        ? new BrandResource($listing->brand)
+                        : null,
+
+                    'category' => $listing->relationLoaded('category')
+                        ? new CategoryResource($listing->category)
+                        : null,
+
+                    'seller'   => $seller ? [
+                        'id'            => $seller->id,
+                        'name'          => $seller->name,
+                        'phone'         => $seller->phone,
+                        // ✅ These feed the Haversine formula in Flutter
+                        'warehouse_lat' => $vendorAddress?->latitude,
+                        'warehouse_lng' => $vendorAddress?->longitude,
+                    ] : null,
                 ];
             }),
         ];
