@@ -55,6 +55,16 @@ class MarketplaceListing extends Model
         return $this->belongsTo(Brand::class);
     }
 
+    public function carts()
+    {
+        return $this->hasMany(Cart::class, 'listing_id');
+    }
+
+    public function orderItems()
+    {
+        return $this->hasMany(OrderItem::class, 'listing_id');
+    }
+
     // ─── Scopes ───────────────────────────────────────────────────────
 
     public function scopeActive($query)
