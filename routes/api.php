@@ -7,6 +7,10 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\MarketplaceListingController;
+use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\VendorInventoryController;
+use App\Http\Controllers\Api\VendorOrderController;
 
 /*
 |--------------------------------------------------------------------------
@@ -109,6 +113,59 @@ Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
     ->middleware('signed')
     ->name('verification.verify');
+
+/*
+|--------------------------------------------------------------------------
+| Cart Routes (customer)
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('cart')->group(function () {
+    Route::get('/',        [CartController::class, 'index']);   // View cart
+    Route::post('/',       [CartController::class, 'store']);   // Add item
+    Route::put('/{id}',    [CartController::class, 'update']);  // Update qty
+    Route::delete('/clear',[CartController::class, 'clear']);   // Clear cart
+    Route::delete('/{id}', [CartController::class, 'destroy']); // Remove item
+});
+
+/*
+|--------------------------------------------------------------------------
+| Order Routes (customer)
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('orders')->group(function () {
+    Route::get('/',              [OrderController::class, 'history']);      // Order history
+    Route::get('/{id}',          [OrderController::class, 'show']);         // Single order
+    Route::post('/direct',       [OrderController::class, 'placeDirect']);  // Direct order
+    Route::post('/from-cart',    [OrderController::class, 'placeFromCart']);// Checkout cart
+    Route::delete('/{id}/cancel',[OrderController::class, 'cancel']);       // Cancel order
+});
+
+/*
+|--------------------------------------------------------------------------
+| Vendor Order Management (incoming order requests from customers)
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('vendor/orders')->group(function () {
+    Route::get('/',             [VendorOrderController::class, 'index']);    // All order items for this vendor
+    Route::get('/{id}',         [VendorOrderController::class, 'show']);     // Single item detail
+    Route::post('/{id}/accept', [VendorOrderController::class, 'accept']);   // Accept → stock deducted
+    Route::post('/{id}/decline',[VendorOrderController::class, 'decline']);  // Decline → reason required
+});
+
+/*
+|--------------------------------------------------------------------------
+| Vendor Inventory Management
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('vendor/inventory')->group(function () {
+    Route::get('/',              [VendorInventoryController::class, 'index']);    // All listings with stock
+    Route::get('/{id}',          [VendorInventoryController::class, 'show']);     // Single listing with stats
+    Route::patch('/{id}/restock',[VendorInventoryController::class, 'restock']); // Add stock manually
+});
 
 /*
 |--------------------------------------------------------------------------
