@@ -14,6 +14,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Events\OrderPlaced; // Added for WebSocket broadcasting
+use App\Notifications\OrderPlacedNotification;
+use App\Models\User;
 
 class OrderController extends Controller
 {
@@ -29,7 +32,6 @@ class OrderController extends Controller
 
         $listing = MarketplaceListing::findOrFail($request->listing_id);
 
-        // ── Guards ─────────────────────────────────────────────────────
         if ($listing->status !== MarketplaceListing::STATUS_ACTIVE) {
             return response()->json([
                 'message' => 'This listing is not currently available.',
@@ -49,7 +51,6 @@ class OrderController extends Controller
             ], 422);
         }
 
-        // ── Validate delivery address ownership ────────────────────────
         if ($request->delivery_address_id) {
             $ownsAddress = \App\Models\Address::where('id', $request->delivery_address_id)
                 ->where('user_id', $customerId)
@@ -72,7 +73,7 @@ class OrderController extends Controller
                 'notes'               => $request->notes,
             ]);
 
-            OrderItem::create([
+            $item = OrderItem::create([
                 'order_id'                => $order->id,
                 'listing_id'              => $listing->id,
                 'vendor_id'               => $listing->seller_id,
@@ -83,6 +84,10 @@ class OrderController extends Controller
                 'subtotal'                => $subtotal,
                 'status'                  => OrderItem::STATUS_PENDING,
             ]);
+
+            // Broadcast event to vendor
+            $vendor = User::find($item->vendor_id);
+            $vendor->notify(new OrderPlacedNotification($item));
 
             return $order;
         });
@@ -113,7 +118,6 @@ class OrderController extends Controller
             return response()->json(['message' => 'Your cart is empty.'], 422);
         }
 
-        // ── Validate delivery address ownership ────────────────────────
         if ($request->delivery_address_id) {
             $ownsAddress = \App\Models\Address::where('id', $request->delivery_address_id)
                 ->where('user_id', $customerId)
@@ -124,9 +128,6 @@ class OrderController extends Controller
             }
         }
 
-        // ── Pre-flight stock validation for ALL items ──────────────────
-        // We do this before touching the DB so the whole checkout fails
-        // cleanly if any single item has an issue.
         $errors = [];
 
         foreach ($cartItems as $item) {
@@ -148,8 +149,7 @@ class OrderController extends Controller
             }
 
             if ($listing->available_stock_bags < $item->quantity_bags) {
-                $errors[] = "Insufficient stock for cart item #{$item->id}. " .
-                    "Requested: {$item->quantity_bags} bags, Available: {$listing->available_stock_bags} bags.";
+                $errors[] = "Insufficient stock for cart item #{$item->id}. Requested: {$item->quantity_bags} bags, Available: {$listing->available_stock_bags} bags.";
             }
         }
 
@@ -160,12 +160,10 @@ class OrderController extends Controller
             ], 422);
         }
 
-        // ── Create order inside transaction ────────────────────────────
         $order = DB::transaction(function () use ($customerId, $cartItems, $request) {
 
             $totalAmount = 0;
 
-            // Calculate total
             foreach ($cartItems as $item) {
                 $totalAmount += round($item->listing->price_per_bag * $item->quantity_bags, 2);
             }
@@ -181,7 +179,7 @@ class OrderController extends Controller
             foreach ($cartItems as $item) {
                 $listing = $item->listing;
 
-                OrderItem::create([
+                $orderItem = OrderItem::create([
                     'order_id'                => $order->id,
                     'listing_id'              => $listing->id,
                     'vendor_id'               => $listing->seller_id,
@@ -192,9 +190,11 @@ class OrderController extends Controller
                     'subtotal'                => round($listing->price_per_bag * $item->quantity_bags, 2),
                     'status'                  => OrderItem::STATUS_PENDING,
                 ]);
+
+                // Broadcast event to each vendor
+                broadcast(new OrderPlaced($orderItem));
             }
 
-            // Clear the cart after successful order
             Cart::where('user_id', $customerId)->delete();
 
             return $order;
@@ -206,61 +206,5 @@ class OrderController extends Controller
             'message' => 'Order placed successfully. Awaiting vendor confirmations.',
             'data'    => new OrderResource($order),
         ], 201);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | GET /api/orders
-    | Customer's full order history with pagination
-    |--------------------------------------------------------------------------
-    */
-    public function history(Request $request): JsonResponse
-    {
-        $orders = Order::where('customer_id', Auth::id())
-            ->with(['items.product', 'items.vendor', 'deliveryAddress'])
-            ->latest()
-            ->paginate(15);
-
-        return response()->json(OrderResource::collection($orders)->response()->getData(true));
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | GET /api/orders/{id}
-    | Single order detail for the customer
-    |--------------------------------------------------------------------------
-    */
-    public function show(int $id): JsonResponse
-    {
-        $order = Order::where('id', $id)
-            ->where('customer_id', Auth::id())
-            ->with(['items.product.specifications', 'items.vendor', 'deliveryAddress'])
-            ->firstOrFail();
-
-        return response()->json(['data' => new OrderResource($order)]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | DELETE /api/orders/{id}/cancel
-    | Customer cancels an order — only allowed while fully pending
-    |--------------------------------------------------------------------------
-    */
-    public function cancel(int $id): JsonResponse
-    {
-        $order = Order::where('id', $id)
-            ->where('customer_id', Auth::id())
-            ->firstOrFail();
-
-        if ($order->status !== Order::STATUS_PENDING) {
-            return response()->json([
-                'message' => 'Only fully pending orders can be cancelled. ' .
-                    'Please contact vendors for partial orders.',
-            ], 422);
-        }
-
-        $order->update(['status' => Order::STATUS_CANCELLED]);
-
-        return response()->json(['message' => 'Order cancelled successfully.']);
     }
 }

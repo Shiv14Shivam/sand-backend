@@ -11,7 +11,7 @@ use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\VendorInventoryController;
 use App\Http\Controllers\Api\VendorOrderController;
-
+use App\Http\Controllers\Api\NotificationController;
 /*
 |--------------------------------------------------------------------------
 | Category Routes
@@ -52,6 +52,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/seller/listings/{id}', [MarketplaceListingController::class, 'show']);
     Route::put('/seller/listings/{id}', [MarketplaceListingController::class, 'update']);
     Route::delete('/seller/listings/{id}', [MarketplaceListingController::class, 'destroy']);
+    Route::get('/notifications', [NotificationController::class, 'index']);
+   Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
 });
 
 /*

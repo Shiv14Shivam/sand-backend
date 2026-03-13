@@ -11,7 +11,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-
+use App\Events\OrderItemUpdated;
+use App\Notifications\OrderStatusUpdatedNotification;
+use App\Models\User;
 class VendorOrderController extends Controller
 {
     /*
@@ -156,6 +158,9 @@ class VendorOrderController extends Controller
             // 4. Recalculate parent order status
             $item->order->recalculateStatus();
         });
+        $customer = User::find($item->order->customer_id);
+$customer->notify(new OrderStatusUpdatedNotification($item));
+        broadcast(new OrderItemUpdated($item->fresh()->load('order')));
 
         return response()->json([
             'message'         => 'Order accepted. Stock updated.',
@@ -192,6 +197,9 @@ class VendorOrderController extends Controller
             // Recalculate parent order status
             $item->order->recalculateStatus();
         });
+        $customer = User::find($item->order->customer_id);
+$customer->notify(new OrderStatusUpdatedNotification($item));
+        broadcast(new OrderItemUpdated($item->fresh()->load('order')));
 
         return response()->json([
             'message' => 'Order declined.',

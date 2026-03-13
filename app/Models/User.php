@@ -10,16 +10,14 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, Notifiable;
-    use HasFactory;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
         'name',
         'email',
         'password',
-        'role',
         'phone',
-
+        'role',
     ];
 
     protected $hidden = [
@@ -27,17 +25,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'remember_token',
     ];
 
-    public function addresses()
-    {
-        return $this->hasMany(Address::class);
-    }
-    public function vendor()
-    {
-        return $this->hasOne(Vendor::class);
-    }
-    // added customer
-    public function customer()
-    {
-        return $this->hasOne(Customer::class);
-    }
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+    ];
 }
