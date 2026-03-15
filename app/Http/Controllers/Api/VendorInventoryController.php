@@ -26,7 +26,7 @@ class VendorInventoryController extends Controller
 
         $listings = MarketplaceListing::where('seller_id', Auth::id())
             ->with(['product.specifications', 'product.category', 'product.brand', 'category', 'brand'])
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->when($request->filled('status'), fn($q) => $q->where('status', $request->status))
             ->orderBy('status')
             ->latest()
             ->paginate(20);
@@ -145,6 +145,32 @@ class VendorInventoryController extends Controller
         return response()->json([
             'message'         => 'Stock updated successfully.',
             'new_stock_bags'  => $listing->fresh()->available_stock_bags,
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PATCH /api/vendor/inventory/{id}/prices
+    | Vendor updates price_per_bag and/or delivery_charge_per_ton
+    |--------------------------------------------------------------------------
+    */
+    public function updatePrices(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'price_per_bag'           => ['sometimes', 'required', 'numeric', 'min:0.01', 'max:9999999'],
+            'delivery_charge_per_ton' => ['sometimes', 'required', 'numeric', 'min:0',    'max:9999999'],
+        ]);
+
+        $listing = MarketplaceListing::where('id', $id)
+            ->where('seller_id', Auth::id())
+            ->firstOrFail();
+
+        $listing->update($request->only(['price_per_bag', 'delivery_charge_per_ton']));
+
+        return response()->json([
+            'message'                  => 'Prices updated successfully.',
+            'price_per_bag'            => $listing->fresh()->price_per_bag,
+            'delivery_charge_per_ton'  => $listing->fresh()->delivery_charge_per_ton,
         ]);
     }
 }

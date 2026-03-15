@@ -167,7 +167,8 @@ Route::middleware(['auth:sanctum', 'role:vendor'])->prefix('vendor/orders')->gro
 Route::middleware(['auth:sanctum', 'role:vendor'])->prefix('vendor/inventory')->group(function () {
     Route::get('/',              [VendorInventoryController::class, 'index']);    // All listings with stock
     Route::get('/{id}',          [VendorInventoryController::class, 'show']);     // Single listing with stats
-    Route::patch('/{id}/restock', [VendorInventoryController::class, 'restock']); // Add stock manually
+    Route::patch('/{id}/restock', [VendorInventoryController::class, 'restock']);
+    Route::patch('/{id}/prices', [VendorInventoryController::class, 'updatePrices']); // Add stock manually
 });
 
 /*
