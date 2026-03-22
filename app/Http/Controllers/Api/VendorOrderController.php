@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use App\Events\OrderItemUpdated;
 use App\Notifications\OrderStatusUpdatedNotification;
 use App\Models\User;
+
 class VendorOrderController extends Controller
 {
     /*
@@ -178,11 +179,11 @@ class VendorOrderController extends Controller
 
         $listing = MarketplaceListing::findOrFail($item->listing_id);
 
-        if ($listing->available_stock_bags < $item->quantity_bags) {
+        if ($listing->available_stock_unit < $item->quantity_unit) {
             return response()->json([
                 'message'         => 'Cannot accept: insufficient stock. ' .
-                    "Requested {$item->quantity_bags} bags, only {$listing->available_stock_bags} available.",
-                'available_stock' => $listing->available_stock_bags,
+                    "Requested {$item->quantity_unit} unit, only {$listing->available_stock_unit} available.",
+                'available_stock' => $listing->available_stock_unit,
             ], 422);
         }
 
@@ -193,21 +194,21 @@ class VendorOrderController extends Controller
                 'actioned_at' => now(),
             ]);
 
-            $listing->decrement('available_stock_bags', $item->quantity_bags);
+            $listing->decrement('available_stock_unit', $item->quantity_unit);
 
-            if ($listing->fresh()->available_stock_bags <= 0) {
+            if ($listing->fresh()->available_stock_unit <= 0) {
                 $listing->update(['status' => MarketplaceListing::STATUS_INACTIVE]);
             }
 
             $item->order->recalculateStatus();
         });
         $customer = User::find($item->order->customer_id);
-$customer->notify(new OrderStatusUpdatedNotification($item));
+        $customer->notify(new OrderStatusUpdatedNotification($item));
         broadcast(new OrderItemUpdated($item->fresh()->load('order')));
 
         return response()->json([
             'message'         => 'Order accepted. Stock updated.',
-            'remaining_stock' => $listing->fresh()->available_stock_bags,
+            'remaining_stock' => $listing->fresh()->available_stock_unit,
         ]);
     }
 
@@ -240,7 +241,7 @@ $customer->notify(new OrderStatusUpdatedNotification($item));
             $item->order->recalculateStatus();
         });
         $customer = User::find($item->order->customer_id);
-$customer->notify(new OrderStatusUpdatedNotification($item));
+        $customer->notify(new OrderStatusUpdatedNotification($item));
         broadcast(new OrderItemUpdated($item->fresh()->load('order')));
 
         return response()->json([

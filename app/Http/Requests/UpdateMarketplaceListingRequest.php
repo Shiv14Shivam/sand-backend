@@ -14,10 +14,11 @@ class UpdateMarketplaceListingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'price_per_bag'           => ['sometimes', 'numeric', 'min:0.01', 'max:99999.99'],
-            'delivery_charge_per_ton' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:99999.99'],
-            'available_stock_bags'    => ['sometimes', 'integer', 'min:0', 'max:9999999'],
+            'price_per_unit'           => ['sometimes', 'numeric', 'min:0.01', 'max:99999.99'],
+            'delivery_charge_per_km' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:99999.99'],
+            'available_stock_unit'    => ['sometimes', 'integer', 'min:0', 'max:9999999'],
             'status'                  => ['sometimes', 'in:active,inactive'],
+            'river_source'            => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }
 }

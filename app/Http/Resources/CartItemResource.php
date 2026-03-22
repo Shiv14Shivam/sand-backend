@@ -14,11 +14,11 @@ class CartItemResource extends JsonResource
         return [
             'id'            => $this->id,
             'listing_id'    => $this->listing_id,
-            'quantity_bags' => $this->quantity_bags,
+            'quantity_unit' => $this->quantity_unit,
             'added_at'      => $this->created_at?->toISOString(),
 
             'in_stock' => $listing &&
-                $listing->available_stock_bags >= $this->quantity_bags,
+                $listing->available_stock_unit >= $this->quantity_unit,
 
             'listing' => $this->whenLoaded('listing', function () use ($listing) {
                 $seller        = $listing->seller;
@@ -28,11 +28,11 @@ class CartItemResource extends JsonResource
                 return [
                     'id'                      => $listing->id,
                     'status'                  => $listing->status,
-                    'price_per_bag'           => $listing->price_per_bag,
-                    'delivery_charge_per_ton' => $listing->delivery_charge_per_ton,
-                    'available_stock_bags'    => $listing->available_stock_bags,
+                    'price_per_unit'           => $listing->price_per_unit,
+                    'delivery_charge_per_km' => $listing->delivery_charge_per_km,
+                    'available_stock_unit'    => $listing->available_stock_unit,
                     'line_total'              => round(
-                        $listing->price_per_bag * $this->quantity_bags,
+                        $listing->price_per_unit * $this->quantity_unit,
                         2
                     ),
 

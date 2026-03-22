@@ -7,22 +7,66 @@ use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/notifications
+    // Returns paginated notifications for the authenticated user.
+    // Flutter reads the "data" array from the paginated response.
+    // ─────────────────────────────────────────────────────────────────────────
     public function index(Request $request)
-{
-    return response()->json(
-        $request->user()->notifications()->latest()->paginate(20)
-    );
-}
+    {
+        $notifications = $request->user()
+            ->notifications()
+            ->latest()
+            ->paginate(20);
 
-public function markRead(Request $request, $id)
-{
-    $notification = $request->user()
-        ->notifications()
-        ->where('id', $id)
-        ->firstOrFail();
+        return response()->json($notifications);
+    }
 
-    $notification->markAsRead();
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/notifications/{id}/read
+    // Marks a single notification as read.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function markRead(Request $request, string $id)
+    {
+        $notification = $request->user()
+            ->notifications()
+            ->where('id', $id)
+            ->firstOrFail();
 
-    return response()->json(['message' => 'Notification marked as read']);
-}
+        $notification->markAsRead();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notification marked as read.',
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/notifications/read-all
+    // Marks ALL unread notifications as read at once.
+    // Called when customer taps "Mark all read" in the Flutter UI.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function markAllRead(Request $request)
+    {
+        $request->user()->unreadNotifications->markAsRead();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'All notifications marked as read.',
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/notifications/unread-count
+    // Returns the unread count — used to glow the bell icon in Flutter.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function unreadCount(Request $request)
+    {
+        $count = $request->user()->unreadNotifications()->count();
+
+        return response()->json([
+            'success' => true,
+            'count'   => $count,
+        ]);
+    }
 }

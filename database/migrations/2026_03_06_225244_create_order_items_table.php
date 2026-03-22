@@ -30,8 +30,8 @@ return new class extends Migration
                 ->constrained()
                 ->onDelete('restrict');
 
-            // Quantity requested by customer (in bags)
-            $table->integer('quantity_bags');
+            // Quantity requested by customer (in unit)
+            $table->integer('quantity_unit');
 
             /*
             |------------------------------------------------------
@@ -40,10 +40,10 @@ return new class extends Migration
             | We snapshot pricing so changing listing prices later
             | doesn't affect already-placed orders.
             */
-            $table->decimal('price_per_bag', 10, 2);
-            $table->decimal('delivery_charge_per_ton', 10, 2)->default(0);
+            $table->decimal('price_per_unit', 10, 2);
+            $table->decimal('delivery_charge_per_km', 10, 2)->default(0);
 
-            // quantity_bags × price_per_bag
+            // quantity_unit × price_per_unit
             $table->decimal('subtotal', 12, 2);
 
             /*

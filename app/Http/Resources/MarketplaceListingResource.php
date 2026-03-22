@@ -15,9 +15,9 @@ class MarketplaceListingResource extends JsonResource
             'product_id'               => $this->product_id,
             'category_id'              => $this->category_id,
             'brand_id'                 => $this->brand_id,
-            'price_per_bag'            => $this->price_per_bag,
-            'delivery_charge_per_ton'  => $this->delivery_charge_per_ton,
-            'available_stock_bags'     => $this->available_stock_bags,
+            'price_per_unit'            => $this->price_per_unit,
+            'delivery_charge_per_km'  => $this->delivery_charge_per_km,
+            'available_stock_unit'     => $this->available_stock_unit,
             'status'                   => $this->status,
             'rejection_reason'         => $this->when(
                 $this->status === 'rejected',

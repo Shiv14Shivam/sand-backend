@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->string('short_description')->nullable();
             $table->text('detailed_description')->nullable();
-            $table->string('unit')->nullable();           // e.g. "bag (50kg)"
+            $table->string('unit')->nullable();           // e.g. "unit (50kg)"
             $table->string('unit_weight')->nullable();    // e.g. "50kg"
             $table->boolean('is_active')->default(true);
             $table->integer('sort_order')->default(0);

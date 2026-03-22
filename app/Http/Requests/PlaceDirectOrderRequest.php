@@ -15,7 +15,7 @@ class PlaceDirectOrderRequest extends FormRequest
     {
         return [
             'listing_id'          => ['required', 'integer', 'exists:marketplace_listings,id'],
-            'quantity_bags'       => ['required', 'integer', 'min:1', 'max:99999'],
+            'quantity_unit'       => ['required', 'integer', 'min:1', 'max:99999'],
             'delivery_address_id' => ['nullable', 'integer', 'exists:addresses,id'],
             'notes'               => ['nullable', 'string', 'max:500'],
         ];
@@ -26,8 +26,8 @@ class PlaceDirectOrderRequest extends FormRequest
         return [
             'listing_id.required'         => 'Please select a product listing.',
             'listing_id.exists'           => 'The selected listing does not exist.',
-            'quantity_bags.required'      => 'Quantity is required.',
-            'quantity_bags.min'           => 'Quantity must be at least 1 bag.',
+            'quantity_unit.required'      => 'Quantity is required.',
+            'quantity_unit.min'           => 'Quantity must be at least 1 unit.',
             'delivery_address_id.exists'  => 'Selected delivery address does not exist.',
         ];
     }

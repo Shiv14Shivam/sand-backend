@@ -14,9 +14,9 @@ class OrderItemResource extends JsonResource
             'listing_id'              => $this->listing_id,
             'vendor_id'               => $this->vendor_id,
             'product_id'              => $this->product_id,
-            'quantity_bags'           => $this->quantity_bags,
-            'price_per_bag'           => $this->price_per_bag,
-            'delivery_charge_per_ton' => $this->delivery_charge_per_ton,
+            'quantity_unit'           => $this->quantity_unit,
+            'price_per_unit'           => $this->price_per_unit,
+            'delivery_charge_per_km' => $this->delivery_charge_per_km,
             'subtotal'                => $this->subtotal,
             'status'                  => $this->status,
             'rejection_reason'        => $this->when(
@@ -28,7 +28,7 @@ class OrderItemResource extends JsonResource
 
             // Relationships
             'product' => new ProductResource($this->whenLoaded('product')),
-            'vendor'  => $this->whenLoaded('vendor', fn () => [
+            'vendor'  => $this->whenLoaded('vendor', fn() => [
                 'id'   => $this->vendor->id,
                 'name' => $this->vendor->name,
             ]),

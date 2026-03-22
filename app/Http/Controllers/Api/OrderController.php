@@ -44,10 +44,10 @@ class OrderController extends Controller
             ], 422);
         }
 
-        if ($listing->available_stock_bags < $request->quantity_bags) {
+        if ($listing->available_stock_unit < $request->quantity_unit) {
             return response()->json([
-                'message'         => 'Insufficient stock. Only ' . $listing->available_stock_bags . ' bags available.',
-                'available_stock' => $listing->available_stock_bags,
+                'message'         => 'Insufficient stock. Only ' . $listing->available_stock_unit . ' unit available.',
+                'available_stock' => $listing->available_stock_unit,
             ], 422);
         }
 
@@ -61,7 +61,7 @@ class OrderController extends Controller
             }
         }
 
-        $subtotal = round($listing->price_per_bag * $request->quantity_bags, 2);
+        $subtotal = round($listing->price_per_unit * $request->quantity_unit, 2);
 
         $order = DB::transaction(function () use ($customerId, $listing, $request, $subtotal) {
 
@@ -78,9 +78,9 @@ class OrderController extends Controller
                 'listing_id'              => $listing->id,
                 'vendor_id'               => $listing->seller_id,
                 'product_id'              => $listing->product_id,
-                'quantity_bags'           => $request->quantity_bags,
-                'price_per_bag'           => $listing->price_per_bag,
-                'delivery_charge_per_ton' => $listing->delivery_charge_per_ton,
+                'quantity_unit'           => $request->quantity_unit,
+                'price_per_unit'           => $listing->price_per_unit,
+                'delivery_charge_per_km' => $listing->delivery_charge_per_km,
                 'subtotal'                => $subtotal,
                 'status'                  => OrderItem::STATUS_PENDING,
             ]);
@@ -148,8 +148,8 @@ class OrderController extends Controller
                 continue;
             }
 
-            if ($listing->available_stock_bags < $item->quantity_bags) {
-                $errors[] = "Insufficient stock for cart item #{$item->id}. Requested: {$item->quantity_bags} bags, Available: {$listing->available_stock_bags} bags.";
+            if ($listing->available_stock_unit < $item->quantity_unit) {
+                $errors[] = "Insufficient stock for cart item #{$item->id}. Requested: {$item->quantity_unit} unit, Available: {$listing->available_stock_unit} unit.";
             }
         }
 
@@ -165,7 +165,7 @@ class OrderController extends Controller
             $totalAmount = 0;
 
             foreach ($cartItems as $item) {
-                $totalAmount += round($item->listing->price_per_bag * $item->quantity_bags, 2);
+                $totalAmount += round($item->listing->price_per_unit * $item->quantity_unit, 2);
             }
 
             $order = Order::create([
@@ -184,10 +184,10 @@ class OrderController extends Controller
                     'listing_id'              => $listing->id,
                     'vendor_id'               => $listing->seller_id,
                     'product_id'              => $listing->product_id,
-                    'quantity_bags'           => $item->quantity_bags,
-                    'price_per_bag'           => $listing->price_per_bag,
-                    'delivery_charge_per_ton' => $listing->delivery_charge_per_ton,
-                    'subtotal'                => round($listing->price_per_bag * $item->quantity_bags, 2),
+                    'quantity_unit'           => $item->quantity_unit,
+                    'price_per_unit'           => $listing->price_per_unit,
+                    'delivery_charge_per_km' => $listing->delivery_charge_per_km,
+                    'subtotal'                => round($listing->price_per_unit * $item->quantity_unit, 2),
                     'status'                  => OrderItem::STATUS_PENDING,
                 ]);
 

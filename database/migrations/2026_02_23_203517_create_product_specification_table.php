@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
             $table->string('key');       // e.g. "Grade", "Weight", "Compressive Strength"
-            $table->string('value');     // e.g. "OPC 53", "50kg/bag"
+            $table->string('value');     // e.g. "OPC 53", "50kg/unit"
             $table->integer('sort_order')->default(0);
             $table->timestamps();
         });

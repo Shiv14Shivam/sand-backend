@@ -19,7 +19,7 @@ return new class extends Migration
                 ->constrained('marketplace_listings')
                 ->onDelete('cascade');
 
-            $table->integer('quantity_bags')->default(1);
+            $table->integer('quantity_unit')->default(1);
 
             $table->timestamps();
 

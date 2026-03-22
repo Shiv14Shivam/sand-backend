@@ -16,9 +16,9 @@ return new class extends Migration
             $table->foreignId('brand_id')->constrained()->onDelete('cascade');
 
             // Pricing
-            $table->decimal('price_per_bag', 10, 2);           // price per bag (50kg)
-            $table->decimal('delivery_charge_per_ton', 10, 2)->default(0);
-            $table->integer('available_stock_bags')->default(0); // stock in bags
+            $table->decimal('price_per_unit', 10, 2);           // price per unit (50kg)
+            $table->decimal('delivery_charge_per_km', 10, 2)->default(0);
+            $table->integer('available_stock_unit')->default(0); // stock in unit
 
             // Status
             $table->enum('status', ['active', 'inactive', 'pending', 'rejected'])->default('pending');

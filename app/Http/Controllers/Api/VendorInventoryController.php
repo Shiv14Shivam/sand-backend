@@ -33,23 +33,23 @@ class VendorInventoryController extends Controller
 
         // Enrich each listing with accepted order counts for the vendor dashboard
         $enriched = $listings->getCollection()->map(function (MarketplaceListing $listing) {
-            $acceptedBags = OrderItem::where('listing_id', $listing->id)
+            $acceptedunit = OrderItem::where('listing_id', $listing->id)
                 ->where('status', OrderItem::STATUS_ACCEPTED)
-                ->sum('quantity_bags');
+                ->sum('quantity_unit');
 
-            $pendingBags = OrderItem::where('listing_id', $listing->id)
+            $pendingunit = OrderItem::where('listing_id', $listing->id)
                 ->where('status', OrderItem::STATUS_PENDING)
-                ->sum('quantity_bags');
+                ->sum('quantity_unit');
 
             return array_merge(
                 (new MarketplaceListingResource($listing))->resolve(),
                 [
                     'inventory_summary' => [
-                        'available_stock_bags' => $listing->available_stock_bags,
-                        'total_accepted_bags'  => (int) $acceptedBags,
-                        'pending_request_bags' => (int) $pendingBags,
-                        'is_low_stock'         => $listing->available_stock_bags <= 10,
-                        'is_out_of_stock'      => $listing->available_stock_bags <= 0,
+                        'available_stock_unit' => $listing->available_stock_unit,
+                        'total_accepted_unit'  => (int) $acceptedunit,
+                        'pending_request_unit' => (int) $pendingunit,
+                        'is_low_stock'         => $listing->available_stock_unit <= 10,
+                        'is_out_of_stock'      => $listing->available_stock_unit <= 0,
                     ],
                 ]
             );
@@ -66,8 +66,8 @@ class VendorInventoryController extends Controller
             'stock_summary' => [
                 'total_listings'    => MarketplaceListing::where('seller_id', Auth::id())->count(),
                 'active_listings'   => MarketplaceListing::where('seller_id', Auth::id())->where('status', 'active')->count(),
-                'out_of_stock'      => MarketplaceListing::where('seller_id', Auth::id())->where('available_stock_bags', 0)->count(),
-                'low_stock'         => MarketplaceListing::where('seller_id', Auth::id())->where('available_stock_bags', '<=', 10)->where('available_stock_bags', '>', 0)->count(),
+                'out_of_stock'      => MarketplaceListing::where('seller_id', Auth::id())->where('available_stock_unit', 0)->count(),
+                'low_stock'         => MarketplaceListing::where('seller_id', Auth::id())->where('available_stock_unit', '<=', 10)->where('available_stock_unit', '>', 0)->count(),
             ],
         ]);
     }
@@ -92,12 +92,12 @@ class VendorInventoryController extends Controller
             ->get();
 
         $stats = [
-            'available_stock_bags' => $listing->available_stock_bags,
+            'available_stock_unit' => $listing->available_stock_unit,
             'total_orders'         => $orderItems->count(),
             'pending_orders'       => $orderItems->where('status', 'pending')->count(),
             'accepted_orders'      => $orderItems->where('status', 'accepted')->count(),
             'declined_orders'      => $orderItems->where('status', 'declined')->count(),
-            'total_bags_sold'      => (int) $orderItems->where('status', 'accepted')->sum('quantity_bags'),
+            'total_unit_sold'      => (int) $orderItems->where('status', 'accepted')->sum('quantity_unit'),
             'total_revenue'        => (float) $orderItems->where('status', 'accepted')->sum('subtotal'),
         ];
 
@@ -109,7 +109,7 @@ class VendorInventoryController extends Controller
                     'order_item_id'  => $item->id,
                     'order_id'       => $item->order_id,
                     'customer_name'  => $item->order->customer->name,
-                    'quantity_bags'  => $item->quantity_bags,
+                    'quantity_unit'  => $item->quantity_unit,
                     'subtotal'       => $item->subtotal,
                     'status'         => $item->status,
                     'placed_at'      => $item->order->created_at?->toISOString(),
@@ -128,14 +128,14 @@ class VendorInventoryController extends Controller
     public function restock(Request $request, int $id): JsonResponse
     {
         $request->validate([
-            'add_bags' => ['required', 'integer', 'min:1', 'max:999999'],
+            'add_unit' => ['required', 'integer', 'min:1', 'max:999999'],
         ]);
 
         $listing = MarketplaceListing::where('id', $id)
             ->where('seller_id', Auth::id())
             ->firstOrFail();
 
-        $listing->increment('available_stock_bags', $request->add_bags);
+        $listing->increment('available_stock_unit', $request->add_unit);
 
         // Auto-reactivate if it was set to inactive due to zero stock
         if ($listing->status === MarketplaceListing::STATUS_INACTIVE) {
@@ -144,33 +144,33 @@ class VendorInventoryController extends Controller
 
         return response()->json([
             'message'         => 'Stock updated successfully.',
-            'new_stock_bags'  => $listing->fresh()->available_stock_bags,
+            'new_stock_unit'  => $listing->fresh()->available_stock_unit,
         ]);
     }
 
     /*
     |--------------------------------------------------------------------------
     | PATCH /api/vendor/inventory/{id}/prices
-    | Vendor updates price_per_bag and/or delivery_charge_per_ton
+    | Vendor updates price_per_unit and/or delivery_charge_per_km
     |--------------------------------------------------------------------------
     */
     public function updatePrices(Request $request, int $id): JsonResponse
     {
         $request->validate([
-            'price_per_bag'           => ['sometimes', 'required', 'numeric', 'min:0.01', 'max:9999999'],
-            'delivery_charge_per_ton' => ['sometimes', 'required', 'numeric', 'min:0',    'max:9999999'],
+            'price_per_unit'           => ['sometimes', 'required', 'numeric', 'min:0.01', 'max:9999999'],
+            'delivery_charge_per_km' => ['sometimes', 'required', 'numeric', 'min:0',    'max:9999999'],
         ]);
 
         $listing = MarketplaceListing::where('id', $id)
             ->where('seller_id', Auth::id())
             ->firstOrFail();
 
-        $listing->update($request->only(['price_per_bag', 'delivery_charge_per_ton']));
+        $listing->update($request->only(['price_per_unit', 'delivery_charge_per_km']));
 
         return response()->json([
             'message'                  => 'Prices updated successfully.',
-            'price_per_bag'            => $listing->fresh()->price_per_bag,
-            'delivery_charge_per_ton'  => $listing->fresh()->delivery_charge_per_ton,
+            'price_per_unit'            => $listing->fresh()->price_per_unit,
+            'delivery_charge_per_km'  => $listing->fresh()->delivery_charge_per_km,
         ]);
     }
 }

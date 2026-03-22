@@ -9,7 +9,7 @@ class Cart extends Model
     protected $fillable = [
         'user_id',
         'listing_id',
-        'quantity_bags',
+        'quantity_unit',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────

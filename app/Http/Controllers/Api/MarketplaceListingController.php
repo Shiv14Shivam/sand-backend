@@ -53,38 +53,38 @@ class MarketplaceListingController extends Controller
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        // Validate relationships
         $category = Category::findOrFail($request->category_id);
-        $brand    = Brand::findOrFail($request->brand_id);
-        $product  = Product::findOrFail($request->product_id);
 
-        if ($brand->category_id !== $category->id) {
+        $brand = $request->brand_id
+            ? Brand::findOrFail($request->brand_id)
+            : null;
+
+        $product = Product::findOrFail($request->product_id);
+
+        // Only validate brand↔category & brand↔product when brand is provided
+        if ($brand && $brand->category_id !== $category->id) {
             return response()->json([
                 'message' => 'Brand does not belong to selected category.'
             ], 422);
         }
 
-        if ($product->brand_id !== $brand->id) {
+        if ($brand && $product->brand_id !== null && $product->brand_id !== $brand->id) {
             return response()->json([
                 'message' => 'Product does not belong to selected brand.'
             ], 422);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | 🔒 FIX: Prevent Duplicate Listing by Same Seller
-        |--------------------------------------------------------------------------
-        */
-
+        // Prevent duplicate: update if listing already exists
         $existingListing = MarketplaceListing::where('seller_id', $sellerId)
             ->where('product_id', $product->id)
             ->first();
 
         if ($existingListing) {
             $existingListing->update([
-                'price_per_bag'           => $request->price_per_bag,
-                'delivery_charge_per_ton' => $request->delivery_charge_per_ton ?? 0,
-                'available_stock_bags'    => $request->available_stock_bags,
+                'price_per_unit'           => $request->price_per_unit,
+                'delivery_charge_per_km' => $request->delivery_charge_per_km ?? 0,
+                'available_stock_unit'    => $request->available_stock_unit,
+                'river_source'            => $request->river_source,
                 'status'                  => MarketplaceListing::STATUS_ACTIVE,
             ]);
 
@@ -94,21 +94,16 @@ class MarketplaceListingController extends Controller
             ], 200);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | 🛡️ FIX: Use DB Transaction (Prevents Race Condition)
-        |--------------------------------------------------------------------------
-        */
-
         $listing = DB::transaction(function () use ($sellerId, $product, $category, $brand, $request) {
             return MarketplaceListing::create([
                 'seller_id'               => $sellerId,
                 'product_id'              => $product->id,
                 'category_id'             => $category->id,
-                'brand_id'                => $brand->id,
-                'price_per_bag'           => $request->price_per_bag,
-                'delivery_charge_per_ton' => $request->delivery_charge_per_ton ?? 0,
-                'available_stock_bags'    => $request->available_stock_bags,
+                'brand_id'                => $brand?->id,
+                'price_per_unit'           => $request->price_per_unit,
+                'delivery_charge_per_km' => $request->delivery_charge_per_km ?? 0,
+                'available_stock_unit'    => $request->available_stock_unit,
+                'river_source'            => $request->river_source,
                 'status'                  => MarketplaceListing::STATUS_ACTIVE,
             ]);
         });
@@ -148,9 +143,9 @@ class MarketplaceListingController extends Controller
 
                 return [
                     'id'                      => $listing->id,
-                    'price_per_bag'           => $listing->price_per_bag,
-                    'delivery_charge_per_ton' => $listing->delivery_charge_per_ton,
-                    'available_stock_bags'    => $listing->available_stock_bags,
+                    'price_per_unit'           => $listing->price_per_unit,
+                    'delivery_charge_per_km' => $listing->delivery_charge_per_km,
+                    'available_stock_unit'    => $listing->available_stock_unit,
 
                     'category' => [
                         'id'   => $listing->category?->id,

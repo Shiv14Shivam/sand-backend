@@ -12,4 +12,11 @@ class Vendor extends Model
         'business_type',
         'gst_number',
     ];
+
+    // ─── Relationships ────────────────────────────────────────────────
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 }

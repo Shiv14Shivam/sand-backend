@@ -65,11 +65,11 @@ class CartController extends Controller
             ->with($this->cartRelations())
             ->get();
 
-        // Subtotal = sum of (price_per_bag x quantity_bags) for all items
+        // Subtotal = sum of (price_per_unit x quantity_unit) for all items
         // Does not include delivery charges (calculated client-side)
         $subtotal = $items->sum(function ($item) {
             return $item->listing
-                ? round($item->listing->price_per_bag * $item->quantity_bags, 2)
+                ? round($item->listing->price_per_unit * $item->quantity_unit, 2)
                 : 0;
         });
 
@@ -98,7 +98,7 @@ class CartController extends Controller
     |
     | Called by: Flutter CustomerHomePage _addToCart()
     |            User enters quantity then taps "Add to Cart" in product modal
-    |            This quantity_bags value is what CartPage reads back later
+    |            This quantity_unit value is what CartPage reads back later
     |--------------------------------------------------------------------------
     */
     public function store(StoreCartItemRequest $request): JsonResponse
@@ -113,10 +113,10 @@ class CartController extends Controller
         }
 
         // Guard 2: Requested quantity must not exceed available stock
-        if ($listing->available_stock_bags < $request->quantity_bags) {
+        if ($listing->available_stock_unit < $request->quantity_unit) {
             return response()->json([
                 'message'         => 'Insufficient stock.',
-                'available_stock' => $listing->available_stock_bags,
+                'available_stock' => $listing->available_stock_unit,
             ], 422);
         }
 
@@ -134,7 +134,7 @@ class CartController extends Controller
                 'listing_id' => $request->listing_id,
             ],
             [
-                'quantity_bags' => $request->quantity_bags,
+                'quantity_unit' => $request->quantity_unit,
             ]
         );
 
@@ -182,14 +182,14 @@ class CartController extends Controller
         }
 
         // Guard 2: New quantity must not exceed current available stock
-        if ($listing->available_stock_bags < $request->quantity_bags) {
+        if ($listing->available_stock_unit < $request->quantity_unit) {
             return response()->json([
                 'message'         => 'Insufficient stock.',
-                'available_stock' => $listing->available_stock_bags,
+                'available_stock' => $listing->available_stock_unit,
             ], 422);
         }
 
-        $cartItem->update(['quantity_bags' => $request->quantity_bags]);
+        $cartItem->update(['quantity_unit' => $request->quantity_unit]);
 
         // Reload with full relations including seller.addresses for coordinates
         $cartItem->load($this->cartRelations());

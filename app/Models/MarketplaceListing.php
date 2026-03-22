@@ -15,25 +15,24 @@ class MarketplaceListing extends Model
         'product_id',
         'category_id',
         'brand_id',
-        'price_per_bag',
-        'delivery_charge_per_ton',
-        'available_stock_bags',
+        'price_per_unit',
+        'delivery_charge_per_km',
+        'available_stock_unit',
+        'river_source',
         'status',
         'rejection_reason',
     ];
 
     protected $casts = [
-        'price_per_bag'             => 'decimal:2',
-        'delivery_charge_per_ton'   => 'decimal:2',
-        'available_stock_bags'      => 'integer',
+        'price_per_unit'           => 'decimal:2',
+        'delivery_charge_per_km' => 'decimal:2',
+        'available_stock_unit'    => 'integer',
     ];
 
     const STATUS_ACTIVE   = 'active';
     const STATUS_INACTIVE = 'inactive';
     const STATUS_PENDING  = 'pending';
     const STATUS_REJECTED = 'rejected';
-
-    // ─── Relationships ────────────────────────────────────────────────
 
     public function seller()
     {
@@ -64,8 +63,6 @@ class MarketplaceListing extends Model
     {
         return $this->hasMany(OrderItem::class, 'listing_id');
     }
-
-    // ─── Scopes ───────────────────────────────────────────────────────
 
     public function scopeActive($query)
     {

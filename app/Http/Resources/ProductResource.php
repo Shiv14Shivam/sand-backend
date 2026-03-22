@@ -26,6 +26,7 @@ class ProductResource extends JsonResource
             ),
             'category'             => new CategoryResource($this->whenLoaded('category')),
             'brand'                => new BrandResource($this->whenLoaded('brand')),
+            'image_url' => $this->image_url,
         ];
     }
 }

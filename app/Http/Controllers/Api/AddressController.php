@@ -6,11 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Address;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 
 class AddressController extends Controller
 {
-    // Get all addresses of logged-in user
+    // ── GET /addresses ────────────────────────────────────────────────────────
     public function index()
     {
         $addresses = Address::where('user_id', Auth::id())
@@ -20,52 +19,24 @@ class AddressController extends Controller
         return response()->json($addresses);
     }
 
-    // Store a new address
+    // ── POST /addresses ───────────────────────────────────────────────────────
+    // lat/lng come directly from the Flutter map pin — no geocoding needed.
     public function store(Request $request)
     {
         $user = Auth::user();
 
         $request->validate([
-            'label'           => 'required|string|max:50',
-            'address_line_1'  => 'required|string|max:255',
-            'city'            => 'required|string|max:100',
-            'state'           => 'required|string|max:100',
-            'pincode'         => 'required|string|max:10',
+            'label'          => 'required|string|max:50',
+            'address_line_1' => 'required|string|max:255',
+            'address_line_2' => 'nullable|string|max:255',
+            'city'           => 'required|string|max:100',
+            'state'          => 'required|string|max:100',
+            'pincode'        => 'required|string|max:10',
+            'latitude'       => 'nullable|numeric|between:-90,90',
+            'longitude'      => 'nullable|numeric|between:-180,180',
+            'is_default'     => 'nullable|boolean',
         ]);
 
-        // Combine full address for geocoding
-        $fullAddress =
-            $request->address_line_1 . ', ' .
-            $request->city . ', ' .
-            $request->state . ', ' .
-            $request->pincode;
-
-        // Call OpenStreetMap Nominatim API
-        $lat = null;
-        $lng = null;
-
-        try {
-            $response = Http::withHeaders([
-                'User-Agent' => 'SandApp/1.0'
-            ])->timeout(5)->get(
-                'https://nominatim.openstreetmap.org/search',
-                [
-                    'q'      => $fullAddress,
-                    'format' => 'json',
-                    'limit'  => 1,
-                ]
-            );
-
-            if ($response->successful() && count($response->json()) > 0) {
-                $data = $response->json()[0];
-                $lat  = $data['lat'];
-                $lng  = $data['lon'];
-            }
-        } catch (\Exception $e) {
-            // Geocoding failed — store address without coordinates
-        }
-
-        // If this address is marked default, unset all other defaults for this user
         if ($request->boolean('is_default')) {
             Address::where('user_id', $user->id)
                 ->update(['is_default' => false]);
@@ -79,15 +50,15 @@ class AddressController extends Controller
             'city'           => $request->city,
             'state'          => $request->state,
             'pincode'        => $request->pincode,
-            'latitude'       => $lat,
-            'longitude'      => $lng,
+            'latitude'       => $request->latitude,
+            'longitude'      => $request->longitude,
             'is_default'     => $request->boolean('is_default'),
         ]);
 
         return response()->json($address, 201);
     }
 
-    // Update an existing address
+    // ── PUT /addresses/{id} ───────────────────────────────────────────────────
     public function update(Request $request, $id)
     {
         $address = Address::where('id', $id)
@@ -97,45 +68,14 @@ class AddressController extends Controller
         $request->validate([
             'label'          => 'required|string|max:50',
             'address_line_1' => 'required|string|max:255',
+            'address_line_2' => 'nullable|string|max:255',
             'city'           => 'required|string|max:100',
             'state'          => 'required|string|max:100',
             'pincode'        => 'required|string|max:10',
+            'latitude'       => 'nullable|numeric|between:-90,90',
+            'longitude'      => 'nullable|numeric|between:-180,180',
+            'is_default'     => 'nullable|boolean',
         ]);
-
-        // Re-geocode if address fields changed
-        $lat = $address->latitude;
-        $lng = $address->longitude;
-
-        $addressChanged =
-            $address->address_line_1 !== $request->address_line_1 ||
-            $address->city           !== $request->city           ||
-            $address->state          !== $request->state          ||
-            $address->pincode        !== $request->pincode;
-
-        if ($addressChanged) {
-            $fullAddress =
-                $request->address_line_1 . ', ' .
-                $request->city . ', ' .
-                $request->state . ', ' .
-                $request->pincode;
-
-            try {
-                $geoRes = Http::withHeaders(['User-Agent' => 'SandApp/1.0'])
-                    ->timeout(5)
-                    ->get('https://nominatim.openstreetmap.org/search', [
-                        'q'      => $fullAddress,
-                        'format' => 'json',
-                        'limit'  => 1,
-                    ]);
-
-                if ($geoRes->successful() && count($geoRes->json()) > 0) {
-                    $lat = $geoRes->json()[0]['lat'];
-                    $lng = $geoRes->json()[0]['lon'];
-                }
-            } catch (\Exception $e) {
-                // Keep old coordinates
-            }
-        }
 
         if ($request->boolean('is_default')) {
             Address::where('user_id', Auth::id())
@@ -150,15 +90,20 @@ class AddressController extends Controller
             'city'           => $request->city,
             'state'          => $request->state,
             'pincode'        => $request->pincode,
-            'latitude'       => $lat,
-            'longitude'      => $lng,
+            // Keep old coords if the user did not re-pin on the map
+            'latitude'       => $request->filled('latitude')
+                ? $request->latitude
+                : $address->latitude,
+            'longitude'      => $request->filled('longitude')
+                ? $request->longitude
+                : $address->longitude,
             'is_default'     => $request->boolean('is_default'),
         ]);
 
-        return response()->json($address);
+        return response()->json($address->fresh());
     }
 
-    // Delete an address
+    // ── DELETE /addresses/{id} ────────────────────────────────────────────────
     public function destroy($id)
     {
         $address = Address::where('id', $id)
@@ -170,31 +115,31 @@ class AddressController extends Controller
         return response()->json(['message' => 'Address deleted successfully']);
     }
 
-    // Set an address as default
+    // ── POST /addresses/{id}/default ──────────────────────────────────────────
     public function setDefault($id)
     {
-        // Unset all defaults for this user
         Address::where('user_id', Auth::id())
             ->update(['is_default' => false]);
 
-        // Set the chosen one
         $address = Address::where('id', $id)
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
         $address->update(['is_default' => true]);
 
-        return response()->json(['message' => 'Default address updated', 'address' => $address]);
+        return response()->json([
+            'message' => 'Default address updated',
+            'address' => $address,
+        ]);
     }
 
-    // Get default address of logged-in user
+    // ── GET /address/default ──────────────────────────────────────────────────
     public function getDefault()
     {
         $address = Address::where('user_id', Auth::id())
             ->where('is_default', true)
             ->first();
 
-        // FIX: always return proper JSON — never a raw null
         if (!$address) {
             return response()->json(['message' => 'No default address found'], 404);
         }
