@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Auth\Events\Verified;
 use App\Models\Vendor;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
+use Illuminate\Auth\Events\PasswordReset;
 
 class AuthController extends Controller
 {
@@ -206,5 +209,76 @@ class AuthController extends Controller
         if (in_array($domain, $blocked)) {
             abort(422, 'Temporary email addresses are not allowed.');
         }
+    }
+    // ================= FORGOT PASSWORD =================
+    public function forgotPassword(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        // Check user exists first to give a helpful message
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'No account found with this email address.',
+            ], 404);
+        }
+
+        $status = Password::sendResetLink(
+            $request->only('email')
+        );
+
+        if ($status === Password::RESET_LINK_SENT) {
+            return response()->json([
+                'message' => 'Password reset link sent to your email.',
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Unable to send reset link. Please try again.',
+        ], 500);
+    }
+
+    // ================= RESET PASSWORD =================
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'token'    => 'required',
+            'email'    => 'required|email',
+            'password' => 'required|min:6|confirmed',
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) {
+                $user->forceFill([
+                    'password'       => Hash::make($password),
+                    'remember_token' => Str::random(60),
+                ])->save();
+
+                // Revoke all existing tokens for security
+                $user->tokens()->delete();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        if ($status === Password::PASSWORD_RESET) {
+            return response()->json([
+                'message' => 'Password reset successfully. Please login with your new password.',
+            ]);
+        }
+
+        // Map Laravel's error status to a readable message
+        $errorMessage = match ($status) {
+            Password::INVALID_TOKEN => 'This reset link is invalid or has already been used.',
+            Password::INVALID_USER  => 'No account found with this email address.',
+            Password::RESET_THROTTLED => 'Too many attempts. Please wait before trying again.',
+            default                 => 'Failed to reset password. Please try again.',
+        };
+
+        return response()->json(['message' => $errorMessage], 422);
     }
 }
