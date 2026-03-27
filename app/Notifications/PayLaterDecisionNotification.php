@@ -49,28 +49,35 @@ class PayLaterDecisionNotification extends Notification implements ShouldBroadca
         $due = $this->item->payment_due_at?->format('d M Y');
 
         return [
-            // ── Accepted: order is COMPLETE, payment just comes later ──────────
+            // ── Title (clear + correct UX) ───────────────────────────────
             'title'  => $this->accepted
-                ? '🎉 Order Complete!'
-                : '❌ Pay Later Rejected',
+                ? 'Order Delivered — Payment Pending'
+                : 'Pay Later Rejected',
 
+            // ── Body (clean + professional) ─────────────────────────────
             'body'   => $this->accepted
-                ? "Your order is complete! Please pay ₹{$this->item->total_amount} by {$due}."
-                : "Vendor rejected pay later. Reason: " . ($this->reason ?? 'Not specified') . '. Order cancelled.',
+                ? "Payment due: ₹{$this->item->total_amount} by {$due}."
+                : "Pay later request rejected. Reason: " . ($this->reason ?? 'Not specified') . '.',
 
-            // ── Order status = delivered means complete ────────────────────────
-            'status'                => $this->accepted ? 'delivered' : 'declined',
-            'payment_status'        => $this->accepted ? 'pay_later' : 'unpaid',
+            // ── Status ──────────────────────────────────────────────────
+            'status'         => $this->accepted ? 'delivered' : 'declined',
+            'payment_status' => $this->accepted ? 'pay_later' : 'unpaid',
 
-            'order_item_id'         => $this->item->id,
-            'order_id'              => $this->item->order_id,
-            'total_amount'          => $this->item->total_amount,
-            'days_requested'        => $this->item->days_requested,
+            // ── Core data ───────────────────────────────────────────────
+            'order_item_id'  => $this->item->id,
+            'order_id'       => $this->item->order_id,
+            'total_amount'   => $this->item->total_amount,
+
+            // ✅ IMPORTANT (you already added correctly)
+            'days_requested' => $this->item->days_requested,
+
             'payment_due_at'        => $this->item->payment_due_at?->toDateTimeString(),
             'payment_due_formatted' => $due,
-            'rejection_reason'      => $this->reason,
-            'product_name'          => $this->item->product->name ?? '',
-            'vendor_name'           => $this->item->vendor->name ?? '',
+
+            'rejection_reason' => $this->reason,
+
+            'product_name' => $this->item->product->name ?? '',
+            'vendor_name'  => $this->item->vendor->name ?? '',
         ];
     }
 }

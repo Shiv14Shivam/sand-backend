@@ -39,6 +39,8 @@ class OrderItem extends Model
     const STATUS_PENDING   = 'pending';
     const STATUS_ACCEPTED  = 'accepted';
     const STATUS_DECLINED  = 'declined';
+    const STATUS_PROCESSING = 'processing';
+    const STATUS_DELIVERED  = 'delivered';
 
     const PAYMENT_UNPAID   = 'unpaid';
     const PAYMENT_PAID     = 'paid';

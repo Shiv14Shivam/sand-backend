@@ -12,7 +12,7 @@ class PayLaterRequestedNotification extends Notification implements ShouldBroadc
 {
     use Queueable;
 
-    public function __construct(public OrderItem $item) {}
+    public function __construct(public OrderItem $item, public int $daysRequested) {}
 
     public function via($notifiable): array
     {
@@ -42,7 +42,7 @@ class PayLaterRequestedNotification extends Notification implements ShouldBroadc
 
     private function payload(): array
     {
-        $days = $this->item->days_requested ?? 3;
+        $days = $this->daysRequested;
         $due  = $this->item->payment_due_at?->format('d M Y');
 
         return [
