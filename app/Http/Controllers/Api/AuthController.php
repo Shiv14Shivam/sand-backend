@@ -21,7 +21,7 @@ class AuthController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email:rfc,dns|unique:users,email',
+            'email' => 'required|email:rfc|unique:users,email',
             'password' => 'required|min:6|confirmed',
             'role' => 'nullable|in:vendor,customer',
             'phone' => 'nullable|string',
@@ -114,7 +114,7 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => [
                 'required',
-                'email:rfc,dns',
+                'email:rfc',
                 Rule::unique('users')->ignore($user->id),
             ],
             'phone' => 'nullable|string',
