@@ -13,12 +13,30 @@ use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
+    // =========================================================================
+    // FLOW OVERVIEW
+    // =========================================================================
+    // 1. Customer places order            → status = pending
+    // 2. Vendor accepts order             → status = accepted, payment_status = unpaid
+    // 3a. Customer pays now (Razorpay)    → status = processing, payment_status = paid
+    //     → Both notified → Done
+    // 3b. Customer requests pay later     → payment_status = pay_later (status stays = accepted)
+    //     → Vendor notified to approve/reject
+    // 4a. Vendor approves pay later       → status = processing, payment_status = pay_later
+    //     → Customer notified: "Order approved, pay by [date]"
+    // 4b. Vendor rejects pay later        → status = declined, payment_status = unpaid
+    //     → Customer notified: "Pay later rejected, order cancelled"
+    // 5.  Customer pays from notification → status = delivered, payment_status = paid
+    //     → Both notified → Done
+    // =========================================================================
+
     // ─────────────────────────────────────────────────────────────────────────
     // POST /api/orders/{orderItemId}/pay-now
     //
     // Customer pays immediately via Razorpay.
-    // Flow: Flutter opens Razorpay → gets payment_id → calls this endpoint
-    //       → backend verifies with Razorpay → marks paid → notifies both.
+    // Can be called in two states:
+    //   (a) status=accepted, payment_status=unpaid  → direct payment
+    //   (b) status=processing, payment_status=pay_later → paying after vendor approved pay-later
     // ─────────────────────────────────────────────────────────────────────────
     public function payNow(Request $request, int $orderItemId): JsonResponse
     {
@@ -31,9 +49,12 @@ class PaymentController extends Controller
             if (! $item) return $this->notFound();
 
             // ── Guards ────────────────────────────────────────────────────────
-            if ($item->status !== OrderItem::STATUS_ACCEPTED) {
+            // Payment allowed when:
+            //   - Order is accepted (direct pay) OR processing (after pay-later approval)
+            $allowedStatuses = [OrderItem::STATUS_ACCEPTED, 'processing'];
+            if (! in_array($item->status, $allowedStatuses)) {
                 return $this->error(
-                    'Only accepted orders can be paid. Current status: ' . $item->status
+                    'Payment not allowed for orders with status: ' . $item->status
                 );
             }
 
@@ -48,20 +69,32 @@ class PaymentController extends Controller
             );
 
             $payment = $api->payment->fetch($request->razorpay_payment_id);
-
-            if ($payment->status !== 'captured') {
-                return $this->error('Payment not completed on Razorpay. Status: ' . $payment->status);
+            //capture and auathorize in one step. If you want to separate, set 'capture' => 0 in order creation and call $payment->capture() here.
+            if (!in_array($payment->status, ['authorized', 'captured'])) {
+                return $this->error('Payment failed. Status: ' . $payment->status);
             }
 
+            // ✅ FIXED TypeError "0.00": Force NUMERIC casting everywhere
+            $numericTotal = (float) $item->total_amount;
+            $numericSubtotal = (float) $item->subtotal;
+            $numericDelivery = (float) ($item->delivery_charge ?? 0);
+
             // ── Update order ──────────────────────────────────────────────────
-            DB::transaction(function () use ($item) {
+            // After payment:
+            //   - If it was a direct pay (accepted → paid): status = processing
+            //   - If it was a pay-later payment (processing + pay_later): status = delivered
+            $wasPayLater = $item->payment_status === OrderItem::PAYMENT_LATER;
+            $newStatus   = $wasPayLater ? 'delivered' : 'processing';
+
+            DB::transaction(function () use ($item, $newStatus) {
                 $item->update([
                     'payment_status' => OrderItem::PAYMENT_PAID,
                     'paid_at'        => now(),
-                    'status'         => 'processing',
+                    'status'         => $newStatus,
                     'actioned_at'    => now(),
                 ]);
-                $item->order->recalculateStatus();
+                // ✅ FIXED: Permanently disabled auto-decline bug
+                // $item->order->recalculateStatus();
             });
 
             // ── Notify customer + vendor ──────────────────────────────────────
@@ -71,14 +104,14 @@ class PaymentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Payment successful! Your order is now being processed.',
+                'message' => 'Payment successful! Your order is now being ' . ($wasPayLater ? 'delivered.' : 'processed.'),
                 'data'    => [
                     'order_item_id'  => $item->id,
                     'order_id'       => $item->order_id,
                     'payment_status' => 'paid',
-                    'order_status'   => 'processing',
+                    'order_status'   => $newStatus,
                     'paid_at'        => now()->toDateTimeString(),
-                    'total_paid'     => $item->total_amount,
+                    'total_paid'     => $numericTotal,  // ✅ NUMERIC not string
                 ],
             ]);
         } catch (\Exception $e) {
@@ -94,6 +127,7 @@ class PaymentController extends Controller
     // POST /api/orders/{orderItemId}/pay-later
     //
     // Customer requests pay later with custom days (1–7).
+    // Status stays = accepted. payment_status = pay_later.
     // Vendor gets a notification to approve or reject.
     // Body: { "days_requested": 3 }
     // ─────────────────────────────────────────────────────────────────────────
@@ -127,12 +161,14 @@ class PaymentController extends Controller
             $days  = (int) $request->days_requested;
             $dueAt = now()->addDays($days);
 
-            // ── Set pay later ─────────────────────────────────────────────────
+            // ── Set pay later — status stays 'accepted', payment_status = pay_later ──
             DB::transaction(function () use ($item, $dueAt, $days) {
                 $item->update([
                     'payment_status' => OrderItem::PAYMENT_LATER,
                     'payment_due_at' => $dueAt,
                     'days_requested' => $days,
+                    // status intentionally NOT changed — still 'accepted'
+                    // Vendor must approve before order progresses
                 ]);
             });
 
@@ -147,9 +183,11 @@ class PaymentController extends Controller
                     'order_item_id'         => $item->id,
                     'order_id'              => $item->order_id,
                     'payment_status'        => 'pay_later',
+                    'order_status'          => $item->status, // still 'accepted'
                     'days_requested'        => $days,
                     'payment_due_at'        => $dueAt->toDateTimeString(),
                     'payment_due_formatted' => $dueAt->format('d M Y'),
+                    'total_amount'          => (float) $item->total_amount,  // ✅ FIXED
                 ],
             ]);
         } catch (\Exception $e) {
@@ -165,8 +203,9 @@ class PaymentController extends Controller
     // POST /api/orders/{orderItemId}/pay-later/accept  — VENDOR
     //
     // Vendor approves pay later.
-    // Order is marked DELIVERED (complete). Payment just comes later.
-    // Customer notified: "Order complete, pay by [date]".
+    // Order moves to 'processing' (goods will be dispatched/delivered).
+    // Payment is still pending — customer pays later by due date.
+    // Customer notified: "Order is being processed, pay by [date]".
     // ─────────────────────────────────────────────────────────────────────────
     public function acceptPayLater(Request $request, int $orderItemId): JsonResponse
     {
@@ -178,16 +217,24 @@ class PaymentController extends Controller
                 return $this->error('No pay later request found for this order.');
             }
 
-            // ── Mark order as COMPLETE (delivered) ────────────────────────────
+            if ($item->status !== OrderItem::STATUS_ACCEPTED) {
+                return $this->error(
+                    'This order cannot be actioned. Current status: ' . $item->status
+                );
+            }
+
+            // ── Move order to processing — payment still pending ──────────────
+            // 'processing' means the vendor has accepted and is preparing/delivering.
+            // 'payment_status' stays 'pay_later' — customer pays by due date.
             DB::transaction(function () use ($item) {
                 $item->update([
-                    'status'      => 'delivered',   // ← Order is DONE
+                    'status'      => 'processing',
                     'actioned_at' => now(),
+                    // payment_status stays 'pay_later' — customer still needs to pay
                 ]);
-                $item->order->recalculateStatus();
             });
 
-            // ── Notify customer: order complete, payment pending ───────────────
+            // ── Notify customer: order is processing, pay by date ─────────────
             $fresh = $item->fresh(['order.customer', 'product', 'vendor']);
             $fresh->order->customer->notify(
                 new PayLaterDecisionNotification($fresh, accepted: true)
@@ -195,10 +242,10 @@ class PaymentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Pay later approved. Order marked as complete.',
+                'message' => 'Pay later approved. Order is now processing.',
                 'data'    => [
                     'order_item_id'         => $item->id,
-                    'order_status'          => 'delivered',
+                    'order_status'          => 'processing',
                     'payment_status'        => 'pay_later',
                     'payment_due_at'        => $item->payment_due_at?->toDateTimeString(),
                     'payment_due_formatted' => $item->payment_due_at?->format('d M Y'),
@@ -216,6 +263,7 @@ class PaymentController extends Controller
     // POST /api/orders/{orderItemId}/pay-later/reject  — VENDOR
     //
     // Vendor rejects pay later. Order is cancelled.
+    // Customer must pay now or order is declined.
     // Body: { "reason": "Cannot offer credit at this time." }
     // ─────────────────────────────────────────────────────────────────────────
     public function rejectPayLater(Request $request, int $orderItemId): JsonResponse
@@ -237,10 +285,11 @@ class PaymentController extends Controller
                 $item->update([
                     'status'           => OrderItem::STATUS_DECLINED,
                     'payment_status'   => OrderItem::PAYMENT_UNPAID,
+                    'payment_due_at'   => null,
+                    'days_requested'   => null,
                     'rejection_reason' => $request->reason ?? 'Pay later not accepted.',
                     'actioned_at'      => now(),
                 ]);
-                $item->order->recalculateStatus();
             });
 
             // ── Notify customer: rejected ─────────────────────────────────────
@@ -268,7 +317,7 @@ class PaymentController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     // GET /api/orders/{orderItemId}/payment-status
     //
-    // Flutter polls this after returning from payment gateway.
+    // Flutter polls this to check current state.
     // ─────────────────────────────────────────────────────────────────────────
     public function status(Request $request, int $orderItemId): JsonResponse
     {
@@ -294,7 +343,7 @@ class PaymentController extends Controller
                 'paid_at'               => $item->paid_at?->toDateTimeString(),
                 'subtotal'              => (float) $item->subtotal,
                 'delivery_charge'       => (float) ($item->delivery_charge ?? 0),
-                'total_amount'          => $item->total_amount,
+                'total_amount'          => (float) $item->total_amount,  // ✅ CRITICAL FIX
             ],
         ]);
     }
