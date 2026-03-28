@@ -1,5 +1,6 @@
 *.log
 .DS_Store
+composer.lock
 .env
 .env.backup
 .env.production
