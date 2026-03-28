@@ -14,6 +14,7 @@
         "laravel/reverb": "^1.8",
         "laravel/sanctum": "^4.2",
         "laravel/tinker": "^2.10.1",
+        "railsware/mailtrap-php": "^3.10",
         "razorpay/razorpay": "^2.9",
         "resend/resend-laravel": "^1.3"
     },
