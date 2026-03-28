@@ -187,18 +187,16 @@ class VendorOrderController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($item, $listing) {
+        DB::transaction(function () use ($item) {
 
             $item->update([
                 'status'      => OrderItem::STATUS_ACCEPTED,
                 'actioned_at' => now(),
+                // Stock is NOT deducted here.
+                // Deduction happens when the order enters 'processing':
+                //   - PaymentController::payNow()        (customer pays directly)
+                //   - PaymentController::acceptPayLater() (vendor approves pay-later)
             ]);
-
-            $listing->decrement('available_stock_unit', $item->quantity_unit);
-
-            if ($listing->fresh()->available_stock_unit <= 0) {
-                $listing->update(['status' => MarketplaceListing::STATUS_INACTIVE]);
-            }
 
             $item->order->recalculateStatus();
         });
@@ -207,8 +205,7 @@ class VendorOrderController extends Controller
         broadcast(new OrderItemUpdated($item->fresh()->load('order')));
 
         return response()->json([
-            'message'         => 'Order accepted. Stock updated.',
-            'remaining_stock' => $listing->fresh()->available_stock_unit,
+            'message' => 'Order accepted. Stock will be reserved when payment is confirmed.',
         ]);
     }
 

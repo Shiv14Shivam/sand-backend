@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\MarketplaceListing;
 use App\Models\OrderItem;
 use App\Notifications\PaymentConfirmedNotification;
 use App\Notifications\PayLaterRequestedNotification;
@@ -69,15 +70,41 @@ class PaymentController extends Controller
             );
 
             $payment = $api->payment->fetch($request->razorpay_payment_id);
-            //capture and auathorize in one step. If you want to separate, set 'capture' => 0 in order creation and call $payment->capture() here.
+
             if (!in_array($payment->status, ['authorized', 'captured'])) {
                 return $this->error('Payment failed. Status: ' . $payment->status);
             }
 
-            // ✅ FIXED TypeError "0.00": Force NUMERIC casting everywhere
-            $numericTotal = (float) $item->total_amount;
+            // ── SECURITY: Verify currency ─────────────────────────────────────
+            if ($payment->currency !== 'INR') {
+                return $this->error('Invalid currency. Expected INR, got: ' . $payment->currency);
+            }
+
+            // ── SECURITY: Verify amount ───────────────────────────────────────
+            // Razorpay stores amount in paise (1 INR = 100 paise).
+            // Compare against order total_amount (subtotal + delivery_charge).
+            // Allow ±1 rupee tolerance only to cover floating-point rounding.
+            $numericTotal    = (float) $item->total_amount;
             $numericSubtotal = (float) $item->subtotal;
             $numericDelivery = (float) ($item->delivery_charge ?? 0);
+
+            $expectedPaise = (int) round($numericTotal * 100);
+            $paidPaise     = (int) $payment->amount;
+
+            if (abs($expectedPaise - $paidPaise) > 100) {
+                // Log for audit — someone is trying to underpay
+                \Illuminate\Support\Facades\Log::warning('Razorpay amount mismatch', [
+                    'order_item_id'  => $item->id,
+                    'customer_id'    => $request->user()->id,
+                    'expected_paise' => $expectedPaise,
+                    'paid_paise'     => $paidPaise,
+                    'payment_id'     => $request->razorpay_payment_id,
+                ]);
+                return $this->error(
+                    'Payment amount mismatch. Expected ₹' . number_format($numericTotal, 2) .
+                    ', received ₹' . number_format($paidPaise / 100, 2) . '. Please contact support.'
+                );
+            }
 
             // ── Update order ──────────────────────────────────────────────────
             // After payment:
@@ -101,6 +128,19 @@ class PaymentController extends Controller
             $fresh = $item->fresh(['order.customer', 'product', 'vendor']);
             $fresh->order->customer->notify(new PaymentConfirmedNotification($fresh));
             $fresh->vendor->notify(new PaymentConfirmedNotification($fresh));
+
+            // ── Deduct stock when entering 'processing' for the first time ────
+            // wasPayLater=true means acceptPayLater() already deducted stock when
+            // the order entered processing; don't deduct again here.
+            if (! $wasPayLater) {
+                $listing = MarketplaceListing::find($item->listing_id);
+                if ($listing) {
+                    $listing->decrement('available_stock_unit', $item->quantity_unit);
+                    if ($listing->fresh()->available_stock_unit <= 0) {
+                        $listing->update(['status' => MarketplaceListing::STATUS_INACTIVE]);
+                    }
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -224,8 +264,6 @@ class PaymentController extends Controller
             }
 
             // ── Move order to processing — payment still pending ──────────────
-            // 'processing' means the vendor has accepted and is preparing/delivering.
-            // 'payment_status' stays 'pay_later' — customer pays by due date.
             DB::transaction(function () use ($item) {
                 $item->update([
                     'status'      => 'processing',
@@ -233,6 +271,15 @@ class PaymentController extends Controller
                     // payment_status stays 'pay_later' — customer still needs to pay
                 ]);
             });
+
+            // ── Deduct stock now that the order is entering processing ─────────
+            $listing = MarketplaceListing::find($item->listing_id);
+            if ($listing) {
+                $listing->decrement('available_stock_unit', $item->quantity_unit);
+                if ($listing->fresh()->available_stock_unit <= 0) {
+                    $listing->update(['status' => MarketplaceListing::STATUS_INACTIVE]);
+                }
+            }
 
             // ── Notify customer: order is processing, pay by date ─────────────
             $fresh = $item->fresh(['order.customer', 'product', 'vendor']);

@@ -97,8 +97,8 @@ class VendorInventoryController extends Controller
             'pending_orders'       => $orderItems->where('status', 'pending')->count(),
             'accepted_orders'      => $orderItems->where('status', 'accepted')->count(),
             'declined_orders'      => $orderItems->where('status', 'declined')->count(),
-            'total_unit_sold'      => (int) $orderItems->where('status', 'accepted')->sum('quantity_unit'),
-            'total_revenue'        => (float) $orderItems->where('status', 'accepted')->sum('subtotal'),
+            'total_unit_sold'      => (int) $orderItems->whereIn('status', ['processing', 'delivered'])->where('payment_status', 'paid')->sum('quantity_unit'),
+            'total_revenue'        => (float) $orderItems->where('payment_status', 'paid')->sum('subtotal'),
         ];
 
         return response()->json([

@@ -17,8 +17,14 @@ class OrderItemResource extends JsonResource
             'quantity_unit'           => $this->quantity_unit,
             'price_per_unit'           => $this->price_per_unit,
             'delivery_charge_per_km' => $this->delivery_charge_per_km,
-            'subtotal'                => $this->subtotal,
+            'delivery_charge'         => (float) ($this->delivery_charge ?? 0),
+            'distance_km'             => $this->distance_km,
+            'subtotal'                => (float) $this->subtotal,
             'status'                  => $this->status,
+            'payment_status'          => $this->payment_status ?? 'unpaid',
+            'paid_at'                 => $this->paid_at?->toISOString(),
+            'payment_due_at'          => $this->payment_due_at?->toISOString(),
+            'days_requested'          => $this->days_requested,
             'rejection_reason'        => $this->when(
                 $this->status === 'declined',
                 $this->rejection_reason
