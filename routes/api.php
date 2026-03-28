@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Mail;
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AddressController;
@@ -148,4 +149,19 @@ Route::middleware(['auth:sanctum', 'role:vendor'])->group(function () {
     // ✅ Pay Later Decision (IMPORTANT ADDITION)
     Route::post('/orders/{orderItemId}/pay-later/accept', [PaymentController::class, 'acceptPayLater']);
     Route::post('/orders/{orderItemId}/pay-later/reject', [PaymentController::class, 'rejectPayLater']);
+});
+
+Route::get('/test-mail', function () {
+    try {
+        Mail::raw('Test email', function ($message) {
+            $message->to('ramsingh69929@gmail.com')
+                ->subject('Test');
+        });
+        return response()->json(['status' => 'Mail sent!']);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'line'  => $e->getLine(),
+        ], 500);
+    }
 });
