@@ -36,17 +36,6 @@ return [
     */
 
     'mailers' => [
-        'mailtrap' => [          // ← INSIDE mailers
-            'transport' => 'mailtrap',
-            'host' => 'sandbox.api.mailtrap.io',
-            'api_key' => env('MAILTRAP_API_KEY'),
-            'inbox_id' => env('MAILTRAP_INBOX_ID'),
-        ],
-
-
-        'resend' => [
-            'transport' => 'resend',
-        ],
 
         'smtp' => [
             'transport' => 'smtp',
@@ -72,7 +61,9 @@ return [
             // ],
         ],
 
-
+        'resend' => [
+            'transport' => 'resend',
+        ],
 
         'sendmail' => [
             'transport' => 'sendmail',
@@ -123,6 +114,5 @@ return [
         'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
-
 
 ];
