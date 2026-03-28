@@ -65,9 +65,7 @@ return [
             // ],
         ],
 
-        'resend' => [
-            'transport' => 'resend',
-        ],
+
 
         'sendmail' => [
             'transport' => 'sendmail',
