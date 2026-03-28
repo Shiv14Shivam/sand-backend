@@ -118,6 +118,9 @@ return [
     ],
     'mailtrap' => [
         'transport' => 'mailtrap',
+        'host' => 'sandbox.api.mailtrap.io',
+        'api_key' => env('MAILTRAP_API_KEY'),
+        'inbox_id' => env('MAILTRAP_INBOX_ID'),
     ],
 
 ];
