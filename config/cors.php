@@ -17,7 +17,7 @@ return [
 
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
     'allowed_methods' => ['*'],
-    'allowed_origins' => ['http://localhost:*', 'http://127.0.0.1:*'],
+    'allowed_origins' => ['*'], // Allow all for dev; restrict in prod: ['http://localhost:*', 'http://127.0.0.1:*', 'http://sandbackend.test:*', 'http://10.0.2.2:*']
     'allowed_headers' => ['*'],
     'exposed_headers' => [],
     'max_age' => 0,
