@@ -31,12 +31,12 @@ Node.js: ^20+ (Vite/Reverb dev server)
 ### Mail Config (config/mail.php)
 ```
 MAIL_MAILER=smtp  # or resend, log
-MAIL_HOST=mailtrap.io  # or smtp.gmail.com, resend.com
-MAIL_PORT=2525
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
 MAIL_USERNAME=your_api_key
 MAIL_PASSWORD=your_password
 MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=noreply@sandhere.com
+MAIL_FROM_ADDRESS=ramsingh69929@gmail.com
 MAIL_FROM_NAME="SandHere"
 ```
 
